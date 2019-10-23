@@ -98,7 +98,7 @@
 
 #define OLED_ADDR			0x3C
 
-//#define DUMP_AT_COMMANDS
+#define DUMP_AT_COMMANDS
 
 
 
@@ -165,8 +165,8 @@ void i2c_scan();
 #define STW_OPEN_BYPASS    2
 #define STW_WAIT_FOR_BYPASS_OPEN  3
 
-#define PRI_FWD_THRESH  25
-#define SEC_FWD_THRESH  25
+#define PRI_FWD_THRESH  15
+#define SEC_FWD_THRESH  19
 #define CLOSE HIGH
 #define OPEN LOW
 #define COOLER HIGH

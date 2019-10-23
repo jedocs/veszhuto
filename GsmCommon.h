@@ -31,7 +31,7 @@
 #include "GsmFifo.h"
 
 #ifndef TINY_GSM_YIELD
-  #define TINY_GSM_YIELD() { delay(0); }
+  #define TINY_GSM_YIELD() { delay(10); }
 #endif
 
 #define TINY_GSM_ATTR_NOT_AVAILABLE __attribute__((error("Not available on this modem type")))

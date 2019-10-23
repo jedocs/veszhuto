@@ -22,6 +22,7 @@
 #define TINY_GSM_MUX_COUNT 5
 
 #include "GsmCommon.h"
+#include "pwds.h"
 
 #define GSM_NL "\r\n"
 static const char GSM_OK[] TINY_GSM_PROGMEM = "OK" GSM_NL;
@@ -47,6 +48,9 @@ enum TinyGSMDateTimeFormat {
   DATE_TIME = 1,
   DATE_DATE = 2
 };
+
+
+
 
 class TinyGsmSim800
 {
@@ -274,7 +278,7 @@ class TinyGsmSim800
       // TODO: Find a better place for this
 
 
-      sendAT(GF("E1"));   // Echo Off
+      sendAT(GF("E0"));   // Echo Off
       if (waitResponse() != 1) {
         return false;
       }
@@ -393,16 +397,16 @@ class TinyGsmSim800
 
       sendAT(GF("+SAPBR=3,1,\"APN\",\""), apn, '"');  // Set the APN
       waitResponse();
-
-      if (user && strlen(user) > 0) {
-        sendAT(GF("+SAPBR=3,1,\"USER\",\""), user, '"');  // Set the user name
-        waitResponse();
-      }
-      if (pwd && strlen(pwd) > 0) {
-        sendAT(GF("+SAPBR=3,1,\"PWD\",\""), pwd, '"');  // Set the password
-        waitResponse();
-      }
-
+      /*
+            if (user && strlen(user) > 0) {
+              sendAT(GF("+SAPBR=3,1,\"USER\",\""), user, '"');  // Set the user name
+              waitResponse();
+            }
+            if (pwd && strlen(pwd) > 0) {
+              sendAT(GF("+SAPBR=3,1,\"PWD\",\""), pwd, '"');  // Set the password
+              waitResponse();
+            }
+      */
       // Define the PDP context
       sendAT(GF("+CGDCONT=1,\"IP\",\""), apn, '"');
       waitResponse();
@@ -601,6 +605,88 @@ class TinyGsmSim800
         return hex;
       }
     }
+
+    bool SendEmail(const String & text) {
+
+      sendAT("+sapbr=3,1,\"Contype\",\"GPRS\"");
+      if (waitResponse() != 1) {
+        Serial.println("sapbr contype hiba");
+      }
+      sendAT("+sapbr=3,1,\"APN\",\"internet.telekom\"");
+      if (waitResponse() != 1) {
+        Serial.println("sapbr APN hiba");
+      }
+
+      sendAT("+sapbr=1,1");
+      if (waitResponse(50000) != 1) {
+        Serial.println("sapbr 1,1 hiba");
+      }
+      sendAT("+emailcid=1");
+      if (waitResponse() != 1) {
+        Serial.println("emailcid");
+      }
+
+      sendAT("+emailto=30");// timeout for smtp server response
+      if (waitResponse() != 1) {
+        Serial.println("emailto hiba");
+      }
+
+      sendAT("+EMAILSSL=1");
+      if (waitResponse() != 1) {
+        Serial.println("emailssl hiba");
+      }
+
+      sendAT(SMTPSRV);
+      if (waitResponse() != 1) {
+        Serial.println("smtp srv hiba");
+      }
+      sendAT(SMTPAUTH);
+      if (waitResponse() != 1) {
+        Serial.println("smtp auth hiba");
+      }
+      sendAT(SMTPFROM);
+      if (waitResponse() != 1) {
+        Serial.println("smtp from hiba");
+      }
+
+      sendAT(SMTPRCPT);
+      if (waitResponse() != 1) {
+        Serial.println("smtp rcpt hiba");
+      }
+
+      sendAT("+smtpsub=\"subject\"");
+      if (waitResponse() != 1) {
+        Serial.println("smtpsub hiba");
+      }
+      unsigned int len = text.length();
+      sendAT("+smtpbody=", len);
+      if (waitResponse(10000L, "DOWNLOAD") != 1) {
+        Serial.println("smtpbody hiba");
+        return false;
+      }
+      Serial.println("mehet");
+
+
+      //sendAT(text);
+      stream.print(text);
+      stream.flush();
+      if (waitResponse() != 1) {
+        Serial.println("stream print hiba");
+      }
+      Serial.println("ment");
+      //delay(100);
+
+      //waitResponse();
+      sendAT("+smtpsend");
+      Serial.println("sent");
+      delay(3000);
+      //sendAT("+sapbr=0,1");
+
+    }
+
+
+
+
 
     bool sendSMS(const String & number, const String & text) {
       sendAT(GF("+CMGF=1"));
@@ -877,17 +963,10 @@ class TinyGsmSim800
                          GsmConstStr r1 = GFP(GSM_OK), GsmConstStr r2 = GFP(GSM_ERROR),
                          GsmConstStr r3 = NULL, GsmConstStr r4 = NULL, GsmConstStr r5 = NULL)
     {
-      /*String r1s(r1); r1s.trim();
-        String r2s(r2); r2s.trim();
-        String r3s(r3); r3s.trim();
-        String r4s(r4); r4s.trim();
-        String r5s(r5); r5s.trim();
-        DBG("### ..:", r1s, ",", r2s, ",", r3s, ",", r4s, ",", r5s);*/
       data.reserve(64);
       int index = 0;
       unsigned long startMillis = millis();
       do {
-        TINY_GSM_YIELD();
         while (stream.available() > 0) {
           int a = stream.read();
           if (a <= 0) continue; // Skip 0x00 bytes, just in case
@@ -939,6 +1018,7 @@ class TinyGsmSim800
             DBG("### Closed: ", mux);
           }
         }
+        TINY_GSM_YIELD();
       } while (millis() - startMillis < timeout_ms);
 finish:
       if (!index) {
