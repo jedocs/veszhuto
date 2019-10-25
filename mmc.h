@@ -98,7 +98,7 @@
 
 #define OLED_ADDR			0x3C
 
-#define DUMP_AT_COMMANDS
+//#define DUMP_AT_COMMANDS
 
 
 
@@ -138,7 +138,7 @@ unsigned int read_SPI();
 void i2c_scan();
 #define RUN_TIME_LIMIT 20
 
-#define STARTUP_DELAY   2 //*********************************************
+#define STARTUP_DELAY   5 //*********************************************
 #define PUMP_STARTUP_DELAY  6
 
 //state machine

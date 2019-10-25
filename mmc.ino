@@ -22,19 +22,19 @@ typedef TinyGsmSim800::GsmClient TinyGsmClient;
 typedef TinyGsmSim800::GsmClientSecure TinyGsmClientSecure;
 
 unsigned long myChannelNumber = 0;  // Replace the 0 with your channel number
-const char * myWriteAPIKey = "8RBBFPUK3ON752QV";    // Paste your ThingSpeak Write API Key between the quotes
+const char * myWriteAPIKey = APIKEY;    // Paste your ThingSpeak Write API Key between the quotes
 // Your GPRS credentials (leave empty, if not needed)
 const char apn[]      = "internet.telekom"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
 const char gprsUser[] = ""; // GPRS User
 const char gprsPass[] = ""; // GPRS Password
 // SIM card PIN (leave empty, if not defined)
-const char simPIN[]   = "";//"3856";
+const char simPIN[]   = SIM_PIN;
 
 const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 
 volatile int interruptCounter;
-unsigned char start_ADC_counter = 0;
+unsigned char start_ADC_counter = ADC_READ_THRESHOLD;
 unsigned char publish_data_counter = 0;
 unsigned char current_state = PRE_STARTUP;
 unsigned char switch_to_cooler_status = 0;
@@ -74,7 +74,7 @@ unsigned int io_0_inputs = 0;
 unsigned int io_7_inputs = 0;
 unsigned int analog_inputs[16];
 
-const unsigned int io_0_debounce_periods[16] = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 2000, 10000};
+const unsigned int io_0_debounce_periods[16] = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 2000, 2000};
 const unsigned int io_7_debounce_periods[16] = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10000};
 
 long unsigned int io_0_lastchange[16];
@@ -98,6 +98,7 @@ float sec_return_temp = 0;
 float sec_fwd_temp = 0;
 float pri_return_temp = 0;
 float pri_fwd_temp = 0;
+float room_temp = 0;
 
 struct publish_data {
   float pri_fwd_temp;
@@ -252,11 +253,6 @@ void setup()
   io_7.pullUp(WATER_PULSE, HIGH);
   io_7.setupInterruptPin(WATER_PULSE, FALLING);
 
-
-
-
-
-
   //***********************************************************
   //*
   //*   create GSM task on core 0
@@ -274,19 +270,14 @@ void setup()
 
   //*********************************************************
 
-
-  while (1) {
+//  while (1) {
 //    if (Serial.available()) {
 //      SerialAT.println(Serial.readStringUntil('\n'));
 //    }
 //    if (SerialAT.available()) {
 //      Serial.println(SerialAT.readStringUntil('\n'));
 //    }
-
-    
-    
-  }
-
+//  }
 
   Wire.begin(I2C_SDA, I2C_SCL);
   bool   isOk = setPowerBoostKeepOn(1);
@@ -297,39 +288,35 @@ void setup()
 
   SPI.begin (SCK, MISO, MOSI, AN_CS);
   /*
-    SerialMon.println(String(sizeof(long)));
-    SerialMon.println(String(sizeof(long long)));
-    while(1){}*/
-  /*
-    if (!SD.begin(SD_CS)) {
-    SerialMon.println("Card Mount Failed");
-    //return;
-    }
-    uint8_t cardType = SD.cardType();
+     if (!SD.begin(SD_CS)) {
+     SerialMon.println("Card Mount Failed");
+     //return;
+     }
+     uint8_t cardType = SD.cardType();
 
-    if (cardType == CARD_NONE) {
-    SerialMon.println("No SD card attached");
-    //return;
-    }
+     if (cardType == CARD_NONE) {
+     SerialMon.println("No SD card attached");
+     //return;
+     }
 
-    SerialMon.print("SD Card Type: ");
-    if (cardType == CARD_MMC) {
-    SerialMon.println("MMC");
-    } else if (cardType == CARD_SD) {
-    SerialMon.println("SDSC");
-    } else if (cardType == CARD_SDHC) {
-    SerialMon.println("SDHC");
-    } else {
-    SerialMon.println("UNKNOWN");
-    }
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    SerialMon.printf("SD Card Size: %lluMB\n", cardSize);
+     SerialMon.print("SD Card Type: ");
+     if (cardType == CARD_MMC) {
+     SerialMon.println("MMC");
+     } else if (cardType == CARD_SD) {
+     SerialMon.println("SDSC");
+     } else if (cardType == CARD_SDHC) {
+     SerialMon.println("SDHC");
+     } else {
+     SerialMon.println("UNKNOWN");
+     }
+     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+     SerialMon.printf("SD Card Size: %lluMB\n", cardSize);
 
-    listDir(SD, "/", 0);
-    SerialMon.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-    SerialMon.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+     listDir(SD, "/", 0);
+     SerialMon.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
+     SerialMon.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
-    writeFile(SD, "/temp_log.txt", "temperature log\n");
+     writeFile(SD, "/temp_log.txt", "temperature log\n");
   */
 
 }
@@ -342,14 +329,16 @@ void setup()
 void loop()
 {
   ReadInputs();
-  io_7.digitalWrite(RED_LED, io_7.digitalRead(BYPASS_VALVE_RUN));
-  io_7.digitalWrite(GREEN_LED, io_7.digitalRead(DIVERTER_VALVE_RUN));
-  io_7.digitalWrite(ORANGE_LED, DIVERTER_RUN);
+
+  io_7.digitalWrite(RED_LED, PRI_FLOW_OK);
+  io_7.digitalWrite(ORANGE_LED, SEC_FLOW_OK);
 
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
+
+    io_7.digitalWrite(GREEN_LED, !io_7.digitalRead(GREEN_LED));
 
     start_ADC_counter++;
     publish_data_counter++;
@@ -383,15 +372,14 @@ void loop()
 
   if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
   if (publish_data_counter > PUBLISH_DATA_THRESHOLD) publish();
-  if (SerialMon.available()) command_interpreter();
+//  if (SerialMon.available()) command_interpreter();
 }
 
-
-//***********************************************************************************************
+//*******************************************************************
 //*
 //*   read inputs, debounce, measure water flow
 //*
-//***********************************************************************************************
+//*******************************************************************
 void ReadInputs(void) {
   unsigned int mask = 0;
 
@@ -454,11 +442,11 @@ void ReadInputs(void) {
   prev_io_7 = current_io_7;
 }
 
-//***********************************************************************************************
+//************************************************************************
 //*
 //*   A/D conversion
 //*
-//***********************************************************************************************
+//************************************************************************
 void ADC() {
   start_ADC_counter = 0;
   digitalWrite(AN_CS, LOW);    // SS is pin 10
@@ -467,7 +455,12 @@ void ADC() {
 
   if (!digitalRead(EOC)) {
     SerialMon.println("ADC hiba1");
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    digitalWrite(AN_CS, LOW);    // SS is pin 10
+    SPI.transfer (0x10);  //reset ADC
+    digitalWrite(AN_CS, HIGH);
+    info += "ADC hiba 1\n";
+    return;
   }
 
   bat_voltage = float(analogRead(VBAT) / 564.634);
@@ -477,7 +470,12 @@ void ADC() {
   }
   if (digitalRead(EOC)) {
     SerialMon.println("ADC hiba2");
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    digitalWrite(AN_CS, LOW);    // SS is pin 10
+    SPI.transfer (0x10);  //reset ADC
+    digitalWrite(AN_CS, HIGH);
+    info += "ADC hiba 2\n";
+    return;
   }
 
   for (byte i = 0; i < 16; i = i + 1) {
@@ -488,7 +486,7 @@ void ADC() {
   sec_fwd_temp = getTemp(analog_inputs[10]);
   pri_return_temp = getTemp(analog_inputs[11]);
   pri_fwd_temp = getTemp(analog_inputs[12]);
-
+  room_temp = getTemp(analog_inputs[6]);
   //info = "sec1: " + String(sec_fwd_temp) + ", ";
   //info += "pri1: " + String(pri_fwd_temp) + "\n";
   //SerialMon.println("sec1: " + String(sec_fwd_temp) + ", pri1: " + String(pri_fwd_temp) + "\n");
@@ -573,7 +571,8 @@ void publish()
   publish_data_counter = 0; //reset publish timer
   struct  publish_data data_to_publish;
   data_to_publish.pri_fwd_temp = pri_fwd_temp;
-  data_to_publish.pri_return_temp = pri_return_temp;
+  data_to_publish.pri_return_temp = room_temp;//
+  pri_return_temp;
   data_to_publish.sec_fwd_temp = sec_fwd_temp;
   data_to_publish.sec_return_temp = sec_return_temp;
   data_to_publish.water_meter = water_flow;

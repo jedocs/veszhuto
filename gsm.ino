@@ -45,11 +45,11 @@ void TaskGSM(void *pvParameters) {
         Serial.println("sending sms from gsm task");
         if (modem.sendSMS(SMS_TARGET, publish_info)) {
           SerialMon.println(publish_info);
-          send_SMS = false;
+          //send_SMS = false;
         }
         else {
           SerialMon.println("SMS failed to send");
-          send_SMS = false;
+          //send_SMS = false;
         }
       }
 
@@ -112,13 +112,18 @@ void TaskGSM(void *pvParameters) {
       }
       client.stop();
       SerialMon.println(F("Server disconnected"));
+      
       modem.gprsDisconnect();
       SerialMon.println(F("GPRS disconnected"));
       //modem.radioOff();
+
+      if (send_SMS) {
+        modem.SendEmail(info);
+        info="";
+        send_SMS = false;
+        //delay(10000);
+      }
     }
-    modem.SendEmail(email+String(cnt));
-    cnt+=1;
-    delay(20000);
-    //Serial.println("GSM task alive on core " + String(xPortGetCoreID()) + "\n");
+    delay(2000);
   }
 }

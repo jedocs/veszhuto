@@ -621,6 +621,7 @@ class TinyGsmSim800
       if (waitResponse(50000) != 1) {
         Serial.println("sapbr 1,1 hiba");
       }
+      
       sendAT("+emailcid=1");
       if (waitResponse() != 1) {
         Serial.println("emailcid");
@@ -679,8 +680,9 @@ class TinyGsmSim800
       //waitResponse();
       sendAT("+smtpsend");
       Serial.println("sent");
-      delay(3000);
-      //sendAT("+sapbr=0,1");
+      delay(10000);
+      
+      sendAT("+sapbr=0,1");
 
     }
 

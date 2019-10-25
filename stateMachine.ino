@@ -5,10 +5,21 @@
 //***********************************************************************************************
 void State_Machine(void) {
   if (!AC_OK) {
-    current_state_bak = current_state;
-    //switch_to_cooler_status_bak = switch_to_cooler_status;
-    //switch_to_water_status_bak = switch_to_water_status;
-    current_state = WAIT_FOR_AC;
+    if (current_state != WAIT_FOR_AC) {
+      io_7.digitalWrite(PUMP, PUMP_OFF);
+      io_7.digitalWrite(SSR , LOW); //SSR off
+      takeover_valves = false;
+         
+      current_state_bak = current_state;
+      
+      current_state = WAIT_FOR_AC;
+      info += "Aramszunet!!!, current state:" + String(current_state);
+      info += "\nstc state:"+String(switch_to_cooler_status);
+      info += "\nstw state:"+String(switch_to_water_status);
+      publish_info = info;
+      send_SMS = true;
+      publish();
+    }
   }
 
   switch (current_state)
@@ -41,6 +52,7 @@ void State_Machine(void) {
       //kompresszor megy?
       if (!COMPR_OK) {
         Serial.println ("A kompresszor nem megy!!");
+        info += "A kompresszor nem megy!\n";
       }
 
       Serial.println(String((BYPASS_OPEN ? "bypass NYITVA" : "bypass ZÁRVA")));
@@ -65,6 +77,7 @@ void State_Machine(void) {
       takeover_valves = true;
       delay(20);
       SerialMon.println("szelepvezérlés átvéve");
+      //info+="szelepvezerles atveve\n"
 
       if ((pri_fwd_temp < PRI_FWD_THRESH) & (PRI_FLOW_OK)) {
         SerialMon.println("primer előremenő hőmérséklet OK, " + String(pri_fwd_temp) + "C");
@@ -75,6 +88,7 @@ void State_Machine(void) {
           //Serial.println ("bypass open -> close bypass");
           switch_to_cooler_status = STC_CLOSE_BYPASS;
           current_state = SWITCH_TO_COOLER;
+          //info+="bypass szelep nyitva -> zárás\n";
           break;
         }
         else {
@@ -82,10 +96,12 @@ void State_Machine(void) {
             //Serial.println ("bypass closed, div on water -> sw div to cooler");
             switch_to_cooler_status = STC_SWITCH_DIVERTER_TO_COOLER;
             current_state = SWITCH_TO_COOLER;
+            //info+="bypass szelep zárva, váltószelep: víz -> váltás vízhűtőre\n";
             break;
           }
           else {
             //Serial.println ("bypass closed, div on cooler -> sw div to water");
+            //info+="bypass szelep zárva, váltószelep: vízhűtő -> váltás csapvízre\n";
             switch_to_cooler_status = STC_SWITCH_DIVERTER;
             current_state = SWITCH_TO_COOLER;
             break;
@@ -125,8 +141,7 @@ void State_Machine(void) {
     case SWITCH_TO_COOLER:
       switch (switch_to_cooler_status) {
         case STC_CLOSE_BYPASS:    //first close bypass valve to decrease pressure
-          //Serial.println ("switch to cooler close bypass");
-          //io_7.digitalWrite(SSR , LOW); //SSR off
+          io_7.digitalWrite(SSR , LOW); //SSR off
           delay(20);
           io_7.digitalWrite(BYPASS_VALVE, CLOSE); //BYPASS valve close
           if (DIVERTER_ON_COOLER) {
@@ -134,7 +149,7 @@ void State_Machine(void) {
             io_7.digitalWrite(DIVERTER_VALVE, WATER);
           }
           delay(50);
-          //io_7.digitalWrite(SSR , HIGH); //SSR on
+          io_7.digitalWrite(SSR , HIGH); //SSR on
           run_time = 0;
           switch_to_cooler_status = STC_WAIT_FOR_BYPASS_CLOSE;
           break;
@@ -147,30 +162,32 @@ void State_Machine(void) {
           }
 
           if ((run_time > RUN_TIME_LIMIT) & BYPASS_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("BYPASS Szelephiba, a szelep nem állt le!");
             info += "BYPASS szelephiba, a szelep nem allt le!\n";
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            
             current_state = ERROR_;
             break;
           }
 
           if (wait_for_div & (run_time > RUN_TIME_LIMIT) & DIVERTER_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("DIVERTER Szelephiba, a szelep nem állt le!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            
             info += "DIVERTER szelephiba, a szelep nem allt le!\n";
             current_state = ERROR_;
             break;
 
           }
           if ((run_time == 3) & !BYPASS_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("BYPASS Szelephiba, a szelep nem megy!");
-            info += "BYPASS Szelephiba, a szelep nem megy!\n";
+            info += "BYPASS szelephiba, a szelep nem megy!\n";
             current_state = ERROR_;
             break;
           }
           if (wait_for_div & (run_time == 3) & !DIVERTER_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("diverter Szelephiba, a szelep nem megy!");
             info += "DIVERTER szelephiba, a szelep nem megy!";
             current_state = ERROR_;
@@ -179,7 +196,7 @@ void State_Machine(void) {
 
           if ((run_time > 3) & !BYPASS_RUN & !DIVERTER_RUN) {
             SerialMon.println("Szelepek leálltak, runtime : " + String(run_time));
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
 
             if (BYPASS_CLOSED & DIVERTER_ON_WATER) {
               switch_to_cooler_status = STC_SWITCH_DIVERTER_TO_COOLER;
@@ -198,18 +215,20 @@ void State_Machine(void) {
           }
 
           if (run_time > RUN_TIME_LIMIT)  {
-            SerialMon.println("valami bug van a kódban!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
+            SerialMon.println("valami bug van a kódban!");            
+            info += "sw bug in STC_WAIT_FOR_BYPASS_CLOSE";
+            current_state = ERROR_;
             break;
           }
           break;
 
         case STC_SWITCH_DIVERTER:
-          //io_7.digitalWrite(SSR , LOW); //SSR off
+          io_7.digitalWrite(SSR , LOW); //SSR off
           delay(20);
           io_7.digitalWrite(DIVERTER_VALVE, WATER);
           delay(50);
-          //io_7.digitalWrite(SSR , HIGH); //SSR on
+          io_7.digitalWrite(SSR , HIGH); //SSR on
           run_time = 0;
           switch_to_cooler_status = STC_WAIT_FOR_DIVERTER;
           break;
@@ -219,14 +238,14 @@ void State_Machine(void) {
           SerialMon.println("diverter runtime : " + String(run_time));
 
           if ((run_time > RUN_TIME_LIMIT) & DIVERTER_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             info += "DIVERTER szelephiba, a szelep nem allt le!\n";
             current_state = ERROR_;
             break;
           }
 
           if ((run_time == 3) & !DIVERTER_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             info += "DIVERTER szelephiba, a szelep nem megy!";
             current_state = ERROR_;
             break;
@@ -234,11 +253,11 @@ void State_Machine(void) {
 
           if ((run_time > 3) & !DIVERTER_RUN) {
             SerialMon.println("Szelep leállt, runtime : " + String(run_time));
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
 
             if (DIVERTER_ON_WATER) {
               SerialMon.println("diverter on water ");
-              info += "valtoszelep atallt csapvizre\n";
+              //info += "valtoszelep atallt csapvizre\n";
               switch_to_cooler_status = STC_SWITCH_DIVERTER_TO_COOLER;
               break;
             }
@@ -252,19 +271,21 @@ void State_Machine(void) {
           }
 
           if (run_time > RUN_TIME_LIMIT)  {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("valami bug van a kódban! diverter");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            info += "sw bug in STC_WAIT_FOR_DIVERTER";
+
             break;
           }
           break;
 
         case STC_SWITCH_DIVERTER_TO_COOLER:
           //Serial.println ("switch to cooler switch diverter to cooler");
-          //io_7.digitalWrite(SSR , LOW); //SSR off
+          io_7.digitalWrite(SSR , LOW); //SSR off
           delay(20);
           io_7.digitalWrite(DIVERTER_VALVE, COOLER); //diverter valve to cooler
           delay(50);
-          //io_7.digitalWrite(SSR , HIGH); //SSR on
+          io_7.digitalWrite(SSR , HIGH); //SSR on
           run_time = 0;
           switch_to_cooler_status = STC_WAIT_FOR_DIVERTER_COOLER;
           break;
@@ -274,15 +295,16 @@ void State_Machine(void) {
           SerialMon.println("diverter runtime : " + String(run_time));
 
           if ((run_time > RUN_TIME_LIMIT) & DIVERTER_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("diverter Szelephiba, a szelep nem áll le!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            
             info += "valtszelep hiba, a szelep nem allt le!\n";
             current_state = ERROR_;
             break;
           }
 
           if ((run_time == 3) & !DIVERTER_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("diverter Szelephiba, a szelep nem megy!");
             info += "valtoszelep hiba, a szelep nem megy!\n";
             current_state = ERROR_;
@@ -290,10 +312,11 @@ void State_Machine(void) {
           }
 
           if ((run_time > 3) & !DIVERTER_RUN) {
+
             SerialMon.println("Szelep leállt, runtime : " + String(run_time));
-            //io_7.digitalWrite(SSR , LOW); //SSR off
 
             if (DIVERTER_ON_COOLER) {
+              io_7.digitalWrite(SSR , HIGH); //SSR on
               io_7.digitalWrite(PUMP, PUMP_ON);
               info += "Aktualis uzemmod: vizhuto.\n";
               // send sms
@@ -309,6 +332,7 @@ void State_Machine(void) {
 
             //switch_to_cooler_status = SWITCH_DIVERTER_TO_COOLER;
             else {
+              io_7.digitalWrite(SSR , LOW); //SSR off
               info += "valtoszelep beragadt\n";
               current_state = ERROR_;
               break;
@@ -316,12 +340,12 @@ void State_Machine(void) {
           }
 
           if (run_time > RUN_TIME_LIMIT)  {
-            SerialMon.println("valami bug van a kódban! diverter");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
+            info += ("valami bug van a kódban! stc switch diverter cooler");
             current_state = ERROR_;
             break;
           }
-          SerialMon.println("waiting for diverter valve");
+          //SerialMon.println("waiting for diverter valve");
           break;
       }
       break;
@@ -341,7 +365,7 @@ void State_Machine(void) {
         info += "szekunder eloremeno hom.: " + String(sec_fwd_temp) + "C, ";
         if (!PRI_FLOW_OK) info += "Primer atfolyas NOK\n";
         if (!SEC_FLOW_OK) info += "Szekunder atfolyas NOK\n";
-        if (!PUMP_OK) info += "A szivattyú nem megy\n";
+        if (!PUMP_OK) info += "A szivattyu nem megy\n";
         info += "Atallas csapvizre\n";
         io_7.digitalWrite(PUMP, PUMP_OFF);
         switch_to_water_status = STW_SWITCH_DIVERTER_TO_WATER;
@@ -352,11 +376,11 @@ void State_Machine(void) {
     case SWITCH_TO_WATER:
       switch (switch_to_water_status) {
         case STW_SWITCH_DIVERTER_TO_WATER:
-          //io_7.digitalWrite(SSR , LOW); //SSR off
+          io_7.digitalWrite(SSR , LOW); //SSR off
           delay(20);
           io_7.digitalWrite(DIVERTER_VALVE, WATER); //diverter valve to water
           delay(50);
-          //io_7.digitalWrite(SSR , HIGH); //SSR on
+          io_7.digitalWrite(SSR , HIGH); //SSR on
           run_time = 0;
           switch_to_water_status = STW_WAIT_FOR_DIVERTER_WATER;
           break;
@@ -366,15 +390,16 @@ void State_Machine(void) {
           SerialMon.println("runtime: " + String(run_time));
 
           if ((run_time > RUN_TIME_LIMIT) & DIVERTER_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("diverter szelephiba, a szelep nem áll le!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            
             info += "valtoszelep hiba, a szelep nem allt le!\n";
             current_state = ERROR_;
             break;
           }
 
           if ((run_time == 3) & !DIVERTER_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("diverter Szelephiba, a szelep nem megy!");
             info += "valtoszelep hiba, a szelep nem megy!\n";
             current_state = ERROR_;
@@ -382,8 +407,8 @@ void State_Machine(void) {
           }
 
           if ((run_time > 3) & !DIVERTER_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("Szelep leállt, runtime: " + String(run_time));
-            //io_7.digitalWrite(SSR , LOW); //SSR off
 
             if (DIVERTER_ON_WATER) {
               if (BYPASS_OPEN) {
@@ -411,8 +436,9 @@ void State_Machine(void) {
           }
 
           if (run_time > RUN_TIME_LIMIT)  {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("valami bug van a kódban! diverter");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            
             info += "BUG!!!\n";
             current_state = ERROR_;
             break;
@@ -420,29 +446,29 @@ void State_Machine(void) {
           break;
 
         case STW_OPEN_BYPASS:
-          //io_7.digitalWrite(SSR , LOW); //SSR off
+          io_7.digitalWrite(SSR , LOW); //SSR off
           delay(20);
           io_7.digitalWrite(BYPASS_VALVE, OPEN); //BYPASS valve close
           delay(50);
-          //io_7.digitalWrite(SSR , HIGH); //SSR on
+          io_7.digitalWrite(SSR , HIGH); //SSR on
           run_time = 0;
           switch_to_water_status = STW_WAIT_FOR_BYPASS_OPEN;
           break;
 
         case STW_WAIT_FOR_BYPASS_OPEN:
           run_time ++;
-          SerialMon.println("BYPASS runtime : " + String(run_time));
+          //SerialMon.println("BYPASS runtime : " + String(run_time));
 
           if ((run_time > RUN_TIME_LIMIT) & BYPASS_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("BYPASS Szelephiba, a szelep nem állt le!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
             info += "BYPASS szelephiba, a szelep nem allt le!\n";
             current_state = ERROR_;
             break;
           }
 
           if ((run_time == 3) & !BYPASS_RUN) {
-            //io_7.digitalWrite(SSR , LOW); //SSR off
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("BYPASS Szelephiba, a szelep nem megy!");
             info += "BYPASS szelephiba, a szelep nem megy!\n";
             current_state = ERROR_;
@@ -450,8 +476,8 @@ void State_Machine(void) {
           }
 
           if ((run_time > 3) & !BYPASS_RUN) {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("BYPASS Szelep leállt, runtime : " + String(run_time));
-            //io_7.digitalWrite(SSR , LOW); //SSR off
             if (BYPASS_OPEN) {
               info += "Aktualis uzemmod: csapviz.\n";
               //Serial.println("*************info**************");
@@ -472,9 +498,10 @@ void State_Machine(void) {
           }
 
           if (run_time > RUN_TIME_LIMIT)  {
+            io_7.digitalWrite(SSR , LOW); //SSR off
             SerialMon.println("valami bug van a kódban!");
-            //io_7.digitalWrite(SSR , LOW); //SSR off
-            info += "BUG!!!\n";
+            
+            info += "BUG11!!!\n";
             current_state = ERROR_;
             break;
           }
@@ -488,8 +515,11 @@ void State_Machine(void) {
 
     case ERROR_:
       Serial.println("**************ERROR******************");
-      Serial.println(info);
-      publish_info = info;
+      io_7.digitalWrite(PUMP, PUMP_OFF);
+      io_7.digitalWrite(SSR , LOW); //SSR off
+      takeover_valves = false;
+      
+      info=+"\n**************ERROR******************";
       send_SMS = true;
       publish();
       current_state = ERROR_WAIT;
@@ -499,7 +529,12 @@ void State_Machine(void) {
       break;
 
     case WAIT_FOR_AC:
-
+      if (AC_OK) {
+        old_bypass_pos = BYPASS_OPEN;
+        old_diverter_pos = DIVERTER_ON_WATER;
+        info += "Aramellatas ok, ujraindulas\n";
+        current_state = STARTUP;
+      }
       break;
     default :
       Serial.println ("switch - case hiba");
