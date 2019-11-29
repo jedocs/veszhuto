@@ -1,3 +1,4 @@
+#include <LiquidCrystal_PCF8574.h>
 
 //no sec flow -> SMS
 
@@ -21,10 +22,10 @@ typedef TinyGsmSim800 TinyGsm;
 typedef TinyGsmSim800::GsmClient TinyGsmClient;
 typedef TinyGsmSim800::GsmClientSecure TinyGsmClientSecure;
 
-unsigned long myChannelNumber = 0;  // Replace the 0 with your channel number
+unsigned long myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
 const char * myWriteAPIKey = APIKEY;    // Paste your ThingSpeak Write API Key between the quotes
 // Your GPRS credentials (leave empty, if not needed)
-const char apn[]      = "internet.telekom"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
+const char apn[]      = "internet.vodafone.net";//"internet.telekom"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
 const char gprsUser[] = ""; // GPRS User
 const char gprsPass[] = ""; // GPRS Password
 // SIM card PIN (leave empty, if not defined)
@@ -73,9 +74,22 @@ unsigned int prev_io_7 = 0;
 unsigned int io_0_inputs = 0;
 unsigned int io_7_inputs = 0;
 unsigned int analog_inputs[16];
+unsigned int compressor_current = 0;
+unsigned int pump_current = 0;
 
-const unsigned int io_0_debounce_periods[16] = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 2000, 2000};
-const unsigned int io_7_debounce_periods[16] = {0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10000};
+const unsigned int io_0_debounce_periods[16] =
+  //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
+{ 10, 0, 0, 0, 0, 10, 10, 0,
+  //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
+  10, 10, 10, 10, 10, 2000, 2000, 10
+};
+
+const unsigned int io_7_debounce_periods[16] =
+  //PB_LED, IO1, IO2, IO3, PB_B, PB_R, PB_L, PB1
+{ 0, 0, 0, 0, 10, 10, 10, 10,
+  //SELFTEST, IO8, IO9, IO10, RED_LED, GREEN_LED, ORANGE_LED, PB2
+  1, 0, 0, 0, 0, 0, 0, 10
+};
 
 long unsigned int io_0_lastchange[16];
 long unsigned int io_7_lastchange[16];
@@ -99,6 +113,8 @@ float sec_fwd_temp = 0;
 float pri_return_temp = 0;
 float pri_fwd_temp = 0;
 float room_temp = 0;
+float he_return_temp = 0;
+float he_fwd_temp = 0;
 
 struct publish_data {
   float pri_fwd_temp;
@@ -112,7 +128,7 @@ struct publish_data {
 };
 
 QueueHandle_t queue;
-
+//#define DUMP_AT_COMMANDS
 #ifdef DUMP_AT_COMMANDS
 #include <StreamDebugger.h>
 StreamDebugger debugger(SerialAT, SerialMon);
@@ -124,6 +140,8 @@ TinyGsm modem(SerialAT);
 Adafruit_MCP23017 io_0;
 Adafruit_MCP23017 io_7;
 TinyGsmClient client(modem);
+
+LiquidCrystal_PCF8574 lcd(0x24);
 //WiFiClient client;
 
 void TaskGSM( void *pvParameters );
@@ -144,7 +162,6 @@ void setup()
   btStop();
   setCpuFrequencyMhz(80);
 
-  pinMode(PB, INPUT_PULLUP);
   pinMode(INTA_7, INPUT);
   pinMode(EOC, INPUT);
 
@@ -152,15 +169,16 @@ void setup()
   pinMode(AN_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
   pinMode(SD_CS, OUTPUT);
-  pinMode(BUZZER, OUTPUT);
   pinMode(WD, OUTPUT);
   pinMode(MODEM_PWKEY, OUTPUT);
   pinMode(MODEM_RST, OUTPUT);
   pinMode(MODEM_POWER_ON, OUTPUT);
+  pinMode(MMV_TRIG, OUTPUT);
+  pinMode(MMV_RESET, OUTPUT);
 
   digitalWrite(MODEM_PWKEY, LOW);
   digitalWrite(MODEM_RST, HIGH);
-  digitalWrite(MODEM_POWER_ON, HIGH);
+  digitalWrite(MODEM_POWER_ON, HIGH);//HIGH
 
   SerialMon.begin(115200);
   SerialMon.println("setup begin");
@@ -183,25 +201,55 @@ void setup()
   io_0.begin();
   io_7.begin(7);
 
+  lcd.begin(20, 4);
+  lcd.setBacklight(255);
+  lcd.home();
+  lcd.clear();
+  lcd.setCursor(6, 0);
+  lcd.print("veszhuto");
+
+  lcd.setCursor(3, 2);
+  lcd.print("inicializalas");
+
   // We mirror INTA and INTB, so that only one line is required between MCP and Arduino for int reporting
   // The INTA/B will not be Floating
   // INTs will be signaled with a LOW
   io_0.setupInterrupts(true, false, LOW);
   io_7.setupInterrupts(true, false, LOW);
 
-  io_0.pinMode(SELFTEST_OUT, OUTPUT);
+  io_0.pinMode(AC_MONITOR, INPUT);
+  io_0.pullUp(AC_MONITOR, HIGH);
 
-  io_0.digitalWrite(CTRL_PULSE, HIGH);
+  io_0.digitalWrite(PUMP, HIGH);
+  io_0.pinMode(PUMP, OUTPUT);
+
+  io_0.digitalWrite(CTRL_PULSE, LOW);
   io_0.pinMode(CTRL_PULSE, OUTPUT);
 
-  io_0.digitalWrite(MMV_RESET, LOW);
-  io_0.pinMode(MMV_RESET, OUTPUT);
+  io_0.digitalWrite(SSR, HIGH);
+  io_0.pinMode(SSR, OUTPUT);
 
-  io_0.pinMode(OPTO, INPUT);
-  io_0.pullUp(OPTO, HIGH);
+  io_0.digitalWrite(BYPASS_VALVE, HIGH);
+  io_0.pinMode(BYPASS_VALVE , OUTPUT);
 
-  io_0.pinMode(PB3, INPUT);
-  io_0.pullUp(PB3, HIGH);
+  io_0.pinMode(BYPASS_VALVE_RUN, INPUT);
+  io_0.pullUp(BYPASS_VALVE_RUN, HIGH);
+
+  io_0.pinMode(DIVERTER_VALVE_RUN, INPUT);
+  io_0.pullUp(DIVERTER_VALVE_RUN, HIGH);
+
+  io_0.digitalWrite(DIVERTER_VALVE, HIGH);
+  io_0.pinMode(DIVERTER_VALVE , OUTPUT);
+
+  //PORT B
+  io_0.pinMode(SPARE_IN, INPUT);
+  io_0.pullUp(SPARE_IN, HIGH);
+
+  io_0.pinMode(LIMIT4, INPUT);
+  io_0.pullUp(LIMIT4, HIGH);
+
+  io_0.pinMode(LIMIT3, INPUT);
+  io_0.pullUp(LIMIT3, HIGH);
 
   io_0.pinMode(DIVERTER_POS, INPUT);
   io_0.pullUp(DIVERTER_POS, HIGH);
@@ -209,49 +257,37 @@ void setup()
   io_0.pinMode(BYPASS_POS, INPUT);
   io_0.pullUp(BYPASS_POS, HIGH);
 
-  io_0.pinMode(PRI_FLOW, INPUT);
-  io_0.pullUp(PRI_FLOW, HIGH);
-
   io_0.pinMode(SEC_FLOW, INPUT);
   io_0.pullUp(SEC_FLOW, HIGH);
 
-  io_7.digitalWrite(SSR, LOW); //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  io_7.pinMode(SSR , OUTPUT);
+  io_0.pinMode(PRI_FLOW, INPUT);
+  io_0.pullUp(PRI_FLOW, HIGH);
 
-  io_7.digitalWrite(PUMP , HIGH);
-  io_7.pinMode(PUMP , OUTPUT);
+  io_0.pinMode(WATER_PULSE, INPUT);
+  io_0.pullUp(WATER_PULSE, HIGH);
+  io_0.setupInterruptPin(WATER_PULSE, FALLING);
 
-  io_7.digitalWrite(DIVERTER_VALVE, HIGH);
-  io_7.pinMode(DIVERTER_VALVE , OUTPUT);
+  //IO_EXPANDER addr 7
+  //PORT A
+  io_7.pinMode(PB_LED , OUTPUT);
 
-  io_7.digitalWrite(BYPASS_VALVE, HIGH);
-  io_7.pinMode(BYPASS_VALVE , OUTPUT);
+  io_7.pinMode(PB_R, INPUT);
+  io_7.pullUp(PB_R, HIGH);
+  io_7.pinMode(PB_L, INPUT);
+  io_7.pullUp(PB_L, HIGH);
+  io_7.pinMode(PB_B, INPUT);
+  io_7.pullUp(PB_B, HIGH);
 
-  io_7.digitalWrite(CTRL_RELAY, HIGH);
-  io_7.pinMode(CTRL_RELAY , OUTPUT);
+  io_7.pinMode(PB1, INPUT);
+  io_7.pullUp(PB1, HIGH);
 
+  //PORT B
   io_7.pinMode(RED_LED , OUTPUT);
   io_7.pinMode(ORANGE_LED , OUTPUT);
   io_7.pinMode(GREEN_LED , OUTPUT);
 
-  io_7.pinMode(PUMP_RUN, INPUT);
-  io_7.pullUp(PUMP_RUN, LOW);
-
-  io_7.pinMode(BYPASS_VALVE_RUN, INPUT);
-  io_7.pullUp(BYPASS_VALVE_RUN, HIGH);
-
-  io_7.pinMode(DIVERTER_VALVE_RUN, INPUT);
-  io_7.pullUp(DIVERTER_VALVE_RUN, HIGH);
-
-  io_7.pinMode(AC_MONITOR, INPUT);
-  io_7.pullUp(AC_MONITOR, HIGH);
-
-  io_7.pinMode(LIMIT_SW, INPUT);
-  io_7.pullUp(LIMIT_SW, HIGH);
-
-  io_7.pinMode(WATER_PULSE, INPUT);
-  io_7.pullUp(WATER_PULSE, HIGH);
-  io_7.setupInterruptPin(WATER_PULSE, FALLING);
+  io_7.pinMode(PB2, INPUT);
+  io_7.pullUp(PB2, HIGH);
 
   //***********************************************************
   //*
@@ -268,57 +304,15 @@ void setup()
     ,  NULL
     ,  0); //core
 
-  //*********************************************************
-
-//  while (1) {
-//    if (Serial.available()) {
-//      SerialAT.println(Serial.readStringUntil('\n'));
-//    }
-//    if (SerialAT.available()) {
-//      Serial.println(SerialAT.readStringUntil('\n'));
-//    }
-//  }
-
   Wire.begin(I2C_SDA, I2C_SCL);
   bool   isOk = setPowerBoostKeepOn(1);
   info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
   SerialMon.println(info);
-
-  //i2c_scan();
-
+  
+  lcd.setCursor(0, 3);
+  lcd.print(info);
+    
   SPI.begin (SCK, MISO, MOSI, AN_CS);
-  /*
-     if (!SD.begin(SD_CS)) {
-     SerialMon.println("Card Mount Failed");
-     //return;
-     }
-     uint8_t cardType = SD.cardType();
-
-     if (cardType == CARD_NONE) {
-     SerialMon.println("No SD card attached");
-     //return;
-     }
-
-     SerialMon.print("SD Card Type: ");
-     if (cardType == CARD_MMC) {
-     SerialMon.println("MMC");
-     } else if (cardType == CARD_SD) {
-     SerialMon.println("SDSC");
-     } else if (cardType == CARD_SDHC) {
-     SerialMon.println("SDHC");
-     } else {
-     SerialMon.println("UNKNOWN");
-     }
-     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-     SerialMon.printf("SD Card Size: %lluMB\n", cardSize);
-
-     listDir(SD, "/", 0);
-     SerialMon.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-     SerialMon.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
-
-     writeFile(SD, "/temp_log.txt", "temperature log\n");
-  */
-
 }
 
 //***********************************************************
@@ -330,33 +324,35 @@ void loop()
 {
   ReadInputs();
 
-  io_7.digitalWrite(RED_LED, PRI_FLOW_OK);
-  io_7.digitalWrite(ORANGE_LED, SEC_FLOW_OK);
+  io_7.digitalWrite(RED_LED, io_7.digitalRead(PB_R));
+  io_7.digitalWrite(GREEN_LED, io_7.digitalRead(PB_L));
+  io_7.digitalWrite(ORANGE_LED, io_7.digitalRead(PB_B));
 
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
-    io_7.digitalWrite(GREEN_LED, !io_7.digitalRead(GREEN_LED));
+    io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
 
     start_ADC_counter++;
     publish_data_counter++;
 
     //********************** state machine lockup prevention!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if (takeover_valves) {
-      io_0.digitalWrite(MMV_RESET, HIGH); //enable ctrl relay mmv
+      digitalWrite(MMV_RESET, HIGH); //enable ctrl relay mmv
     }
     else {
-      io_0.digitalWrite(MMV_RESET, LOW);
+      digitalWrite(MMV_RESET, LOW);
     }
 
-    if (digitalRead(PB)) {
+    if ((io_7_inputs >> PB1) & 0x1) {
       if (WD_state) {
         digitalWrite(WD, LOW);
         WD_state = false;
         if (takeover_valves) {
           io_0.digitalWrite(CTRL_PULSE, LOW);
+          digitalWrite(MMV_TRIG, LOW);
         }
       }
       else {
@@ -364,15 +360,23 @@ void loop()
         WD_state = true;
         if (takeover_valves) {
           io_0.digitalWrite(CTRL_PULSE, HIGH);
+          digitalWrite(MMV_TRIG, HIGH);
         }
       }
     }
     State_Machine();
+    //sm1();
+
+    //kompresszor megy?
+    //if (!COMPR_OK) {
+      //Serial.println ("A kompresszor nem megy!!");
+      //info += "A kompresszor nem megy!\n";
+    //}
   }
 
   if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
   if (publish_data_counter > PUBLISH_DATA_THRESHOLD) publish();
-//  if (SerialMon.available()) command_interpreter();
+  //if (SerialMon.available()) command_interpreter();
 }
 
 //*******************************************************************
@@ -422,7 +426,7 @@ void ReadInputs(void) {
 
             if (i == WATER_PULSE) {
               long timestamp = millis();
-              if ((io_7_inputs >> WATER_PULSE) & 1) { //water meter pulse detected
+              if ((io_0_inputs >> WATER_PULSE) & 1) { //water meter pulse detected
                 long timediff = timestamp - prev_pulse;
                 prev_pulse = timestamp;
                 if ((timediff < 60000) & (timediff > 600)) {
@@ -486,10 +490,25 @@ void ADC() {
   sec_fwd_temp = getTemp(analog_inputs[10]);
   pri_return_temp = getTemp(analog_inputs[11]);
   pri_fwd_temp = getTemp(analog_inputs[12]);
-  room_temp = getTemp(analog_inputs[6]);
+  room_temp = getTemp(analog_inputs[8]);
+  he_return_temp = getTemp(analog_inputs[6]);
+  he_fwd_temp = getTemp(analog_inputs[7]);
+
+  compressor_current = analog_inputs[0];
+  pump_current = analog_inputs[1];
+
   //info = "sec1: " + String(sec_fwd_temp) + ", ";
   //info += "pri1: " + String(pri_fwd_temp) + "\n";
-  //SerialMon.println("sec1: " + String(sec_fwd_temp) + ", pri1: " + String(pri_fwd_temp) + "\n");
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("p e/v: " + String(pri_fwd_temp) + "C/" + String(pri_return_temp) + "C");
+  lcd.setCursor(0, 1);
+  lcd.print("s e/v: " + String(sec_fwd_temp) + "C/" + String(sec_return_temp) + "C");
+  lcd.setCursor(0, 2);
+  lcd.print("c curr: " + String(compressor_current));
+  lcd.setCursor(0, 3);
+  lcd.print("p curr: " + String(pump_current));
   //appendFile(SD, "/temp_log.txt", info.c_str());
 }
 
@@ -505,39 +524,36 @@ void command_interpreter() {
 
   if (command.equals("pump")) {
 
-    temp = io_7.digitalRead(PUMP);
-    io_7.digitalWrite(PUMP, !temp);
+    temp = io_0.digitalRead(PUMP);
+    io_0.digitalWrite(PUMP, !temp);
   }
 
   else if (command.equals("2w")) {
-    //io_7.digitalWrite(SSR, HIGH);
+    //io_0.digitalWrite(SSR, HIGH);
     delay(300);
-    temp = io_7.digitalRead(BYPASS_VALVE);
+    temp = io_0.digitalRead(BYPASS_VALVE);
     SerialMon.println("BYPASS " + String(temp));
-    io_7.digitalWrite(BYPASS_VALVE, !temp);
+    io_0.digitalWrite(BYPASS_VALVE, !temp);
     delay(100);
-    //io_7.digitalWrite(SSR, HIGH);
+    //io_0.digitalWrite(SSR, HIGH);
 
   }
 
   else if (command.equals("3w")) {
 
-    temp = io_7.digitalRead(DIVERTER_VALVE);
+    temp = io_0.digitalRead(DIVERTER_VALVE);
     SerialMon.println("3W " + String(temp));
-    io_7.digitalWrite(DIVERTER_VALVE, !temp);
+    io_0.digitalWrite(DIVERTER_VALVE, !temp);
   }
 
   else if (command.equals("ssr")) {
 
-    temp = io_7.digitalRead(SSR);
+    temp = io_0.digitalRead(SSR);
     SerialMon.println("SSR " + String(temp));
-    io_7.digitalWrite(SSR, !temp);
+    io_0.digitalWrite(SSR, !temp);
   }
 
   else if (command.equals("ctrl")) {
-
-    temp = io_0.digitalRead(CTRL_PULSE);
-    SerialMon.println("ctrl relay " + String(temp));
     takeover_valves = !takeover_valves;
   }
 
@@ -546,6 +562,10 @@ void command_interpreter() {
     temp = io_0.digitalRead(MMV_RESET);
     SerialMon.println("ctrl relay " + String(temp));
     io_0.digitalWrite(MMV_RESET, !temp);
+  }
+  else if (command.equals("out")) {
+    SerialMon.println("OUT");
+    io_0.pinMode(BYPASS_VALVE , OUTPUT);
   }
 
   else {
@@ -651,3 +671,110 @@ bool setPowerBoostKeepOn(int en)
     Wire.write(0x35); // 0x37 is default reg value
   return Wire.endTransmission() == 0;
 }
+
+
+void sm1(void) {
+
+  switch (current_state)
+  {
+    case 0 :
+      io_0.digitalWrite(DIVERTER_VALVE, 1);
+      current_state = 1;
+      break;
+    case 1:
+      //lcd.setCursor(0, 0);
+      //lcd.print("SSR on ");
+      //lcd.setCursor(0, 2);
+      //lcd.print("PUMP on ");
+      io_0.digitalWrite(SSR, 0);
+      io_0.digitalWrite(PUMP, 0);
+      current_state = 2;
+      break;
+
+    case 2 :
+      //lcd.setCursor(0, 0);
+      //lcd.print("SSR on ");
+      //lcd.setCursor(0, 2);
+      //lcd.print("PUMP off");
+      io_0.digitalWrite(SSR, 0);
+      io_0.digitalWrite(PUMP, 1);
+      current_state = 3;
+      break;
+    case 3 :
+      current_state = 4;
+      break;
+    case 4 :
+      io_0.digitalWrite(BYPASS_VALVE, 0);
+      current_state = 5;
+      break;
+    case 5 :
+
+      current_state = 6;
+      break;
+    case 6 :
+      //lcd.setCursor(0, 0);
+      //lcd.print("SSR off");
+      //lcd.setCursor(0, 2);
+      //lcd.print("PUMP off");
+      io_0.digitalWrite(SSR, 1);
+      io_0.digitalWrite(PUMP, 1);
+      current_state = 7;
+      break;
+    case 7 :
+      io_0.digitalWrite(DIVERTER_VALVE, 0);
+      current_state = 8;
+      break;
+    case 8 :
+      io_0.digitalWrite(BYPASS_VALVE, 1);
+      current_state = 9;
+      break;
+    case 9 :
+
+      current_state = 0;
+      break;
+
+  }
+}
+
+/*
+     if (!SD.begin(SD_CS)) {
+     SerialMon.println("Card Mount Failed");
+     //return;
+     }
+     uint8_t cardType = SD.cardType();
+
+     if (cardType == CARD_NONE) {
+     SerialMon.println("No SD card attached");
+     //return;
+     }
+
+     SerialMon.print("SD Card Type: ");
+     if (cardType == CARD_MMC) {
+     SerialMon.println("MMC");
+     } else if (cardType == CARD_SD) {
+     SerialMon.println("SDSC");
+     } else if (cardType == CARD_SDHC) {
+     SerialMon.println("SDHC");
+     } else {
+     SerialMon.println("UNKNOWN");
+     }
+     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+     SerialMon.printf("SD Card Size: %lluMB\n", cardSize);
+
+     listDir(SD, "/", 0);
+     SerialMon.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
+     SerialMon.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+
+     writeFile(SD, "/temp_log.txt", "temperature log\n");
+*/
+
+//*********************************************************
+
+  //  while (1) {
+  //    if (Serial.available()) {
+  //      SerialAT.println(Serial.readStringUntil('\n'));
+  //    }
+  //    if (SerialAT.available()) {
+  //      Serial.println(SerialAT.readStringUntil('\n'));
+  //    }
+  //  }

@@ -11,6 +11,7 @@ void TaskGSM(void *pvParameters) {
   struct  publish_data data_for_publish;
   unsigned char cnt = 0;
   String email = "Teszt email, szám:";
+  bool wait_text = false;
 
   // Set GSM module baud rate and UART pins
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
@@ -24,24 +25,46 @@ void TaskGSM(void *pvParameters) {
     modem.simUnlock(simPIN);
   }
   delay(5000);
-  /*
-    WiFi.begin(ss45did, password);
-    Serial.println("Connecting");
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      //Serial.print(".");
-    }
-    Serial.println("");
-    Serial.print("Connected to WiFi network with IP Address: ");
-    Serial.println(WiFi.localIP());
-  */
 
   while (1) {
+
+    if (Serial.available()) {
+      SerialAT.println(Serial.readStringUntil('\n'));
+    }
+
+    if (SerialAT.available()) {
+      String msg = SerialAT.readStringUntil('\n');
+      if (wait_text) {
+        if (msg.startsWith("start")) {
+          Serial.println("start parancs");
+        }
+        else if (msg.startsWith("stop")) {
+          Serial.println("stop parancs");
+        }
+        else {
+          Serial.println("ismeretlen parancs");
+          Serial.println(msg);
+        }
+        wait_text = false;
+      }
+      else {
+        if (msg.startsWith("+CMT: \"+36204328253\"")) {
+          Serial.println("SMS jött");
+          wait_text = true;
+        }
+        else {
+          Serial.println(msg);
+        }
+        Serial.println("received sg\n");
+      }
+    }
+
 
     if (xQueueReceive(queue, &data_for_publish, 0)) {
       // modem.restart();
       //Serial.println("   time: " + modem.getGSMDateTime(DATE_TIME));
-      if (send_SMS) {
+      if (false){//send_SMS) {
+        //modem.sendSMS_UTF16("+380679837464", u"Привееет!", 10);
         Serial.println("sending sms from gsm task");
         if (modem.sendSMS(SMS_TARGET, publish_info)) {
           SerialMon.println(publish_info);
@@ -112,14 +135,14 @@ void TaskGSM(void *pvParameters) {
       }
       client.stop();
       SerialMon.println(F("Server disconnected"));
-      
+
       modem.gprsDisconnect();
       SerialMon.println(F("GPRS disconnected"));
       //modem.radioOff();
 
       if (send_SMS) {
-        modem.SendEmail(info);
-        info="";
+        modem.SendEmail(apn, info);
+        info = "";
         send_SMS = false;
         //delay(10000);
       }
@@ -127,3 +150,15 @@ void TaskGSM(void *pvParameters) {
     delay(2000);
   }
 }
+
+/*
+  WiFi.begin(ss45did, password);
+  Serial.println("Connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    //Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to WiFi network with IP Address: ");
+  Serial.println(WiFi.localIP());
+*/

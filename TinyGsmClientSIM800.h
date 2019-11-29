@@ -606,13 +606,15 @@ class TinyGsmSim800
       }
     }
 
-    bool SendEmail(const String & text) {
+    bool SendEmail(const char* apn, const String & text) {
 
       sendAT("+sapbr=3,1,\"Contype\",\"GPRS\"");
       if (waitResponse() != 1) {
         Serial.println("sapbr contype hiba");
       }
-      sendAT("+sapbr=3,1,\"APN\",\"internet.telekom\"");
+
+      //sendAT("+sapbr=3,1,\"APN\",\"internet.telekom\"");
+      sendAT(GF("+SAPBR=3,1,\"APN\",\""), apn, '"');
       if (waitResponse() != 1) {
         Serial.println("sapbr APN hiba");
       }
@@ -621,7 +623,7 @@ class TinyGsmSim800
       if (waitResponse(50000) != 1) {
         Serial.println("sapbr 1,1 hiba");
       }
-      
+
       sendAT("+emailcid=1");
       if (waitResponse() != 1) {
         Serial.println("emailcid");
@@ -681,15 +683,12 @@ class TinyGsmSim800
       sendAT("+smtpsend");
       Serial.println("sent");
       delay(10000);
-      
+
       sendAT("+sapbr=0,1");
 
     }
 
-
-
-
-
+    //************************************************************
     bool sendSMS(const String & number, const String & text) {
       sendAT(GF("+CMGF=1"));
       waitResponse();
@@ -1000,6 +999,8 @@ class TinyGsmSim800
             } else {
               data += mode;
             }
+
+
           } else if (data.endsWith(GF(GSM_NL "+RECEIVE:"))) {
             int mux = stream.readStringUntil(',').toInt();
             int len = stream.readStringUntil('\n').toInt();
