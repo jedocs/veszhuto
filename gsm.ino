@@ -28,15 +28,16 @@ void TaskGSM(void *pvParameters) {
 
   while (1) {
 
-    if (Serial.available()) {
-      SerialAT.println(Serial.readStringUntil('\n'));
-    }
+    //    if (Serial.available()) {
+    //      SerialAT.println(Serial.readStringUntil('\n'));
+    //    }
 
     if (SerialAT.available()) {
       String msg = SerialAT.readStringUntil('\n');
       if (wait_text) {
-        if (msg.startsWith("start")) {
-          Serial.println("start parancs");
+        if (msg.startsWith("restart")) {
+          Serial.println("restart parancs");
+          // ESP.restart();
         }
         else if (msg.startsWith("stop")) {
           Serial.println("stop parancs");
@@ -59,22 +60,24 @@ void TaskGSM(void *pvParameters) {
       }
     }
 
-
     if (xQueueReceive(queue, &data_for_publish, 0)) {
       // modem.restart();
       //Serial.println("   time: " + modem.getGSMDateTime(DATE_TIME));
-      if (false){//send_SMS) {
-        //modem.sendSMS_UTF16("+380679837464", u"Привееет!", 10);
+
+      if (send_SMS) {
         Serial.println("sending sms from gsm task");
         if (modem.sendSMS(SMS_TARGET, publish_info)) {
           SerialMon.println(publish_info);
-          //send_SMS = false;
+          send_SMS = false;
         }
         else {
           SerialMon.println("SMS failed to send");
           //send_SMS = false;
         }
       }
+      else{
+        publish_info = "";
+        }
 
       SerialMon.print("Connecting to APN: ");
       SerialMon.print(apn);
@@ -102,13 +105,15 @@ void TaskGSM(void *pvParameters) {
       if (x == 200) {
         Serial.println("Channel update successful.");
         rr_published = true;
-        publish_info = "";
+        //        if (!send_SMS) {
+        //          publish_info = "";
+        //        }
       }
       else {
         Serial.println("Problem updating channel. HTTP error code " + String(x));
         if (x == 0) {
           rr_published = true;
-          publish_info = "";
+
         }
         /*if (x != 0) {
           // Restart SIM800 module, it takes quite some time
@@ -140,14 +145,14 @@ void TaskGSM(void *pvParameters) {
       SerialMon.println(F("GPRS disconnected"));
       //modem.radioOff();
 
-      if (send_SMS) {
-        modem.SendEmail(apn, info);
+      if (send_mail) {
+        modem.SendEmail(apn, publish_info);
         info = "";
-        send_SMS = false;
+        send_mail = false;
         //delay(10000);
       }
     }
-    delay(2000);
+    delay(200);
   }
 }
 

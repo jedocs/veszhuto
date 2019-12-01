@@ -25,7 +25,7 @@ typedef TinyGsmSim800::GsmClientSecure TinyGsmClientSecure;
 unsigned long myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
 const char * myWriteAPIKey = APIKEY;    // Paste your ThingSpeak Write API Key between the quotes
 // Your GPRS credentials (leave empty, if not needed)
-const char apn[]      = "internet.vodafone.net";//"internet.telekom"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
+const char apn[] = "internet.telekom"; //"internet.vodafone.net";// APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
 const char gprsUser[] = ""; // GPRS User
 const char gprsPass[] = ""; // GPRS Password
 // SIM card PIN (leave empty, if not defined)
@@ -63,6 +63,9 @@ bool SMS_OK = true;
 bool BYPASS_STUCK = false;
 bool DIVERTER_STUCK = false;
 bool send_SMS = false;
+bool send_mail = false;
+bool compr_status = true;
+bool ac_status = true;
 
 int ADC_timer = 0;
 
@@ -79,9 +82,9 @@ unsigned int pump_current = 0;
 
 const unsigned int io_0_debounce_periods[16] =
   //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
-{ 10, 0, 0, 0, 0, 10, 10, 0,
+{ 8000, 0, 0, 0, 0, 10, 10, 0,
   //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
-  10, 10, 10, 10, 10, 2000, 2000, 10
+  10, 10, 10, 10, 10, 5000, 5000, 10
 };
 
 const unsigned int io_7_debounce_periods[16] =
@@ -104,6 +107,7 @@ double C = 9.627280482149224e-8;
 String publish_info;
 String info;
 String command;
+String lcdinfo;
 
 float bat_voltage;
 float water_flow = 0;
@@ -121,8 +125,8 @@ struct publish_data {
   float pri_return_temp;
   float sec_fwd_temp;
   float sec_return_temp;
-  float water_meter;
-  float vbat;
+  int water_meter;
+  int vbat;
   float reset_reason;
   int status_code;
 };
@@ -269,6 +273,7 @@ void setup()
 
   //IO_EXPANDER addr 7
   //PORT A
+  io_7.digitalWrite(PB_LED, HIGH);
   io_7.pinMode(PB_LED , OUTPUT);
 
   io_7.pinMode(PB_R, INPUT);
@@ -308,10 +313,10 @@ void setup()
   bool   isOk = setPowerBoostKeepOn(1);
   info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
   SerialMon.println(info);
-  
+
   lcd.setCursor(0, 3);
   lcd.print(info);
-    
+
   SPI.begin (SCK, MISO, MOSI, AN_CS);
 }
 
@@ -333,7 +338,7 @@ void loop()
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
-    io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
+   // io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
 
     start_ADC_counter++;
     publish_data_counter++;
@@ -346,7 +351,7 @@ void loop()
       digitalWrite(MMV_RESET, LOW);
     }
 
-    if ((io_7_inputs >> PB1) & 0x1) {
+    //if ((io_7_inputs >> PB_B) & 0x1) {
       if (WD_state) {
         digitalWrite(WD, LOW);
         WD_state = false;
@@ -363,20 +368,69 @@ void loop()
           digitalWrite(MMV_TRIG, HIGH);
         }
       }
-    }
+    //}
+    
     State_Machine();
     //sm1();
-
+    
+    if (!ac_status) {
+      if ((io_7_inputs >> PB_B) & 0x1) {
+        lcd.setBacklight(255);
+      }
+      else {
+        lcd.setBacklight(0);
+      }
+    }
+        //ac ok?
+    if (!AC_OK) {
+      if (ac_status) {
+        ac_status = false;
+        Serial.println ("nincs áram!!");
+        publish_info += "nincs aram\nFehervar tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+        lcd.setBacklight(0);
+      }
+    }
+    else {
+      if (!ac_status) {
+        ac_status = true;
+        Serial.println ("van aram");
+        publish_info += "van aram\nFehervar tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+        lcd.setBacklight(255);
+      }
+    }
+        
     //kompresszor megy?
-    //if (!COMPR_OK) {
-      //Serial.println ("A kompresszor nem megy!!");
-      //info += "A kompresszor nem megy!\n";
-    //}
+    if (!COMPR_OK) {
+      if (compr_status) {
+        compr_status = false;
+        Serial.println ("A kompresszor nem megy!!");
+        publish_info += "A kompresszor LEALLT!\nFehervar tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+      }
+    }
+    else {
+      if (!compr_status) {
+        compr_status = true;
+        Serial.println ("A kompresszor elindult");
+        publish_info += "A kompresszor elindult\nFehervar tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+      }
+    }
   }
 
   if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
   if (publish_data_counter > PUBLISH_DATA_THRESHOLD) publish();
-  //if (SerialMon.available()) command_interpreter();
+  if (SerialMon.available()) command_interpreter();
 }
 
 //*******************************************************************
@@ -506,9 +560,8 @@ void ADC() {
   lcd.setCursor(0, 1);
   lcd.print("s e/v: " + String(sec_fwd_temp) + "C/" + String(sec_return_temp) + "C");
   lcd.setCursor(0, 2);
-  lcd.print("c curr: " + String(compressor_current));
-  lcd.setCursor(0, 3);
-  lcd.print("p curr: " + String(pump_current));
+  lcd.print("room temp: " + String(room_temp) + "C");
+  
   //appendFile(SD, "/temp_log.txt", info.c_str());
 }
 
@@ -591,13 +644,12 @@ void publish()
   publish_data_counter = 0; //reset publish timer
   struct  publish_data data_to_publish;
   data_to_publish.pri_fwd_temp = pri_fwd_temp;
-  data_to_publish.pri_return_temp = room_temp;//
-  pri_return_temp;
+  data_to_publish.pri_return_temp = pri_return_temp;
   data_to_publish.sec_fwd_temp = sec_fwd_temp;
-  data_to_publish.sec_return_temp = sec_return_temp;
-  data_to_publish.water_meter = water_flow;
+  data_to_publish.sec_return_temp = room_temp;//sec_return_temp;
+  data_to_publish.water_meter = compressor_current;//water_flow;
   data_to_publish.reset_reason = reset_reason;
-  data_to_publish.vbat = bat_voltage;
+  data_to_publish.vbat = pump_current;//bat_voltage;
   int status_code;
   bitWrite(status_code, 0, SMS_OK);
   bitWrite(status_code, 1, BYPASS_STUCK);
@@ -770,11 +822,11 @@ void sm1(void) {
 
 //*********************************************************
 
-  //  while (1) {
-  //    if (Serial.available()) {
-  //      SerialAT.println(Serial.readStringUntil('\n'));
-  //    }
-  //    if (SerialAT.available()) {
-  //      Serial.println(SerialAT.readStringUntil('\n'));
-  //    }
-  //  }
+//  while (1) {
+//    if (Serial.available()) {
+//      SerialAT.println(Serial.readStringUntil('\n'));
+//    }
+//    if (SerialAT.available()) {
+//      Serial.println(SerialAT.readStringUntil('\n'));
+//    }
+//  }

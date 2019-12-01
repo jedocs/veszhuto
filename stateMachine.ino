@@ -4,24 +4,25 @@
 //*
 //***********************************************************************************************
 void State_Machine(void) {
-  if (!AC_OK) {
-    if (current_state != WAIT_FOR_AC) {
-      io_0.digitalWrite(SSR , OFF); //SSR off
-      io_0.digitalWrite(PUMP, OFF);
-
-      takeover_valves = false;
-
-      current_state_bak = current_state;
-
-      current_state = WAIT_FOR_AC;
-      info += "Aramszunet!!!, current state:" + String(current_state);
-      info += "\nstc state:" + String(switch_to_cooler_status);
-      info += "\nstw state:" + String(switch_to_water_status);
-      publish_info = info;
-      send_SMS = true;
-      publish();
-    }
-  }
+  //  if (!AC_OK) {
+  //    if (current_state != WAIT_FOR_AC) {
+  //      //      io_0.digitalWrite(SSR , OFF); //SSR off
+  //      //    io_0.digitalWrite(PUMP, OFF);
+  //
+  //      //  takeover_valves = false;
+  //
+  //      current_state_bak = current_state;
+  //
+  //      current_state = WAIT_FOR_AC;
+  //      info += "Aramszunet!!!, current state:" + String(current_state);
+  //      info += "\nstc state:" + String(switch_to_cooler_status);
+  //      info += "\nstw state:" + String(switch_to_water_status);
+  //      publish_info = info;
+  //      send_SMS = true;
+  //      send_mail = true;
+  //      publish();
+  //    }
+  //  }
 
   switch (current_state)
   {
@@ -121,8 +122,9 @@ void State_Machine(void) {
           if (BYPASS_OPEN) {
             //Serial.println("\n\n*************info**************");
             //Serial.println(info);
-            publish_info = info;
+            publish_info += info;
             send_SMS = true;
+            send_mail = true;
             publish();
             current_state = RUN_ON_WATER;
             break;
@@ -321,8 +323,9 @@ void State_Machine(void) {
               //Serial.println("*************info**************");
               //Serial.println(info);
               wait_till = long(millis() + PUMP_STARTUP_DELAY * 1000);
-              publish_info = info;
+              publish_info += info;
               send_SMS = true;
+              send_mail = true;
               publish();
               current_state = WAIT_FOR_PUMP;
               break;
@@ -351,7 +354,7 @@ void State_Machine(void) {
       //Serial.println("wait for pump");
       if (millis() > wait_till) {
         //Serial.println(String(millis()) + String(wait_till));
-        io_0.digitalWrite(PUMP, OFF);
+        //io_0.digitalWrite(PUMP, OFF);
         current_state = RUN_ON_COOLER;
         break;
       }
@@ -360,18 +363,44 @@ void State_Machine(void) {
     //*************************************************************************
 
     case RUN_ON_COOLER:
-      if ((pri_fwd_temp > PRI_FWD_THRESH) | (sec_fwd_temp > SEC_FWD_THRESH) | !SEC_FLOW_OK | !PRI_FLOW_OK | !PUMP_OK) { //
-        info = "Vizhuto uzemmod hiba! Primer eloremeno hom.: " + String(pri_fwd_temp) + "C, ";
-        info += "szekunder eloremeno hom.: " + String(sec_fwd_temp) + "C, ";
-        if (!PRI_FLOW_OK) info += "Primer atfolyas NOK\n";
-        if (!SEC_FLOW_OK) info += "Szekunder atfolyas NOK\n";
-        if (!PUMP_OK) info += "A szivattyu nem megy\n";
+      
+      if (!(io_0.digitalRead(AC_MONITOR))  & AC_OK) {
+        if ((pri_fwd_temp > PRI_FWD_THRESH) | (sec_fwd_temp > SEC_FWD_THRESH) | !SEC_FLOW_OK | !PRI_FLOW_OK | !PUMP_OK) { //
+          info = "Vizhuto uzemmod hiba! Primer eloremeno hom.: " + String(pri_fwd_temp) + "C, ";
+          info += "szekunder eloremeno hom.: " + String(sec_fwd_temp) + "C, ";
 
-        info += "Atallas csapvizre\n";
-        io_0.digitalWrite(SSR, OFF);
-        switch_to_water_status = STW_SWITCH_DIVERTER_TO_WATER;
-        current_state = SWITCH_TO_WATER;
+          info += "Atallas csapvizre\n";
+          io_0.digitalWrite(PUMP, OFF);
+          io_0.digitalWrite(SSR, OFF);
+          switch_to_water_status = STW_SWITCH_DIVERTER_TO_WATER;
+          current_state = SWITCH_TO_WATER;
+        }
       }
+      else {
+        lcd.setCursor(0, 3);
+        lcdinfo = "";
+        if (!((io_0_inputs >> AC_MONITOR) & 0x1)) {
+          lcdinfo += ("ac ok");
+        }
+        else {
+          lcdinfo += ("ac NOK");
+        }
+        if (AC_OK) {
+          lcdinfo += ("AC ok");
+        }
+        else {
+          lcdinfo += ("AC NOK");
+        }
+        if (SEC_FLOW_OK) {
+          lcdinfo += ("fl ok");
+        }
+        else {
+          lcdinfo += ("fl NOK");
+        }
+        //lcd.clear();
+        lcd.print(lcdinfo);
+      }
+
       break;
 
     //*********************************************************************************************
@@ -418,8 +447,9 @@ void State_Machine(void) {
                 info += "Aktualis uzemmodd: csapviz.\n";
                 //Serial.println("*************info**************");
                 //Serial.println(info);
-                publish_info = info;
+                publish_info += info;
                 send_SMS = true;
+                send_mail = true;
                 publish();
                 current_state = RUN_ON_WATER;
 
@@ -485,8 +515,9 @@ void State_Machine(void) {
               info += "Aktualis uzemmod: csapviz.\n";
               //Serial.println("*************info**************");
               //Serial.println(info);
-              publish_info = info;
+              publish_info += info;
               send_SMS = true;
+              send_mail = true;
               publish();
               current_state = RUN_ON_WATER;
 
@@ -524,6 +555,7 @@ void State_Machine(void) {
 
       info = +"\n**************ERROR******************";
       send_SMS = true;
+      send_mail = true;
       publish();
       current_state = ERROR_WAIT;
       break;
