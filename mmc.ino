@@ -24,11 +24,15 @@ typedef TinyGsmSim800::GsmClientSecure TinyGsmClientSecure;
 
 unsigned long myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
 const char * myWriteAPIKey = APIKEY;    // Paste your ThingSpeak Write API Key between the quotes
-// Your GPRS credentials (leave empty, if not needed)
-const char apn[] = "internet.telekom"; //"internet.vodafone.net";// APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
+
+#ifdef test
+const char apn[] = "internet.vodafone.net"; // APN (example: internet.vodafone.pt) use https://wiki.apnchanger.org internet.vodafone.net
+#else
+const char apn[] = "internet.telekom";
+#endif
+
 const char gprsUser[] = ""; // GPRS User
 const char gprsPass[] = ""; // GPRS Password
-// SIM card PIN (leave empty, if not defined)
 const char simPIN[]   = SIM_PIN;
 
 const char* ssid     = WIFI_SSID;
@@ -329,9 +333,9 @@ void loop()
 {
   ReadInputs();
 
-  io_7.digitalWrite(RED_LED, io_7.digitalRead(PB_R));
-  io_7.digitalWrite(GREEN_LED, io_7.digitalRead(PB_L));
-  io_7.digitalWrite(ORANGE_LED, io_7.digitalRead(PB_B));
+  io_7.digitalWrite(RED_LED, BYPASS_CLOSED);
+  io_7.digitalWrite(GREEN_LED, DIVERTER_ON_COOLER);
+  io_7.digitalWrite(ORANGE_LED, PRI_FLOW_OK);
 
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
@@ -371,8 +375,7 @@ void loop()
     //}
     
     State_Machine();
-    //sm1();
-    
+       
     if (!ac_status) {
       if ((io_7_inputs >> PB_B) & 0x1) {
         lcd.setBacklight(255);
@@ -381,12 +384,14 @@ void loop()
         lcd.setBacklight(0);
       }
     }
-        //ac ok?
+        
     if (!AC_OK) {
       if (ac_status) {
         ac_status = false;
         Serial.println ("nincs áram!!");
-        publish_info += "nincs aram\nFehervar tavfelugyelet";
+        publish_info += "nincs aram\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
         send_SMS = true;
         send_mail = true;
         publish();
@@ -397,7 +402,9 @@ void loop()
       if (!ac_status) {
         ac_status = true;
         Serial.println ("van aram");
-        publish_info += "van aram\nFehervar tavfelugyelet";
+        publish_info += "van aram\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
         send_SMS = true;
         send_mail = true;
         publish();
@@ -410,7 +417,9 @@ void loop()
       if (compr_status) {
         compr_status = false;
         Serial.println ("A kompresszor nem megy!!");
-        publish_info += "A kompresszor LEALLT!\nFehervar tavfelugyelet";
+        publish_info += "A kompresszor LEALLT!\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
         send_SMS = true;
         send_mail = true;
         publish();
@@ -420,7 +429,9 @@ void loop()
       if (!compr_status) {
         compr_status = true;
         Serial.println ("A kompresszor elindult");
-        publish_info += "A kompresszor elindult\nFehervar tavfelugyelet";
+        publish_info += "A kompresszor elindult\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
         send_SMS = true;
         send_mail = true;
         publish();
@@ -561,6 +572,9 @@ void ADC() {
   lcd.print("s e/v: " + String(sec_fwd_temp) + "C/" + String(sec_return_temp) + "C");
   lcd.setCursor(0, 2);
   lcd.print("room temp: " + String(room_temp) + "C");
+
+  lcd.setCursor(0, 3);
+  lcd.print("flow: " + String(water_flow) + " l/p");
   
   //appendFile(SD, "/temp_log.txt", info.c_str());
 }

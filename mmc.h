@@ -1,10 +1,3 @@
-//SIM800
-// #define UART_TX           	27
-// #define UART_RX           	26
-// #define SIMCARD_RST         5
-// #define SIMCARD_PWKEY       4
-// #define SIM800_POWER_ON  	23
-
 // TTGO T-Call pins
 #define MODEM_RST            5
 #define MODEM_PWKEY          4
@@ -100,14 +93,11 @@
 
 //#define DUMP_AT_COMMANDS
 
-
-
 #define TINY_GSM_MODEM_SIM800      // Modem is SIM800
 #define TINY_GSM_RX_BUFFER   1024  // Set RX buffer to 1Kb
 
 #define ADC_READ_THRESHOLD 1
 #define PUBLISH_DATA_THRESHOLD 60
-
 
 // Set serial for debug console (to Serial Monitor, default speed 115200)
 #define SerialMon Serial

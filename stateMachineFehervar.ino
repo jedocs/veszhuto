@@ -1,4 +1,4 @@
-#if defined (mmc) || defined (szolnok)
+#ifdef fehervar
 
 //***********************************************************************************************
 //*
@@ -6,7 +6,26 @@
 //*
 //***********************************************************************************************
 void State_Machine(void) {
- 
+  //  if (!AC_OK) {
+  //    if (current_state != WAIT_FOR_AC) {
+  //      //      io_0.digitalWrite(SSR , OFF); //SSR off
+  //      //    io_0.digitalWrite(PUMP, OFF);
+  //
+  //      //  takeover_valves = false;
+  //
+  //      current_state_bak = current_state;
+  //
+  //      current_state = WAIT_FOR_AC;
+  //      info += "Aramszunet!!!, current state:" + String(current_state);
+  //      info += "\nstc state:" + String(switch_to_cooler_status);
+  //      info += "\nstw state:" + String(switch_to_water_status);
+  //      publish_info = info;
+  //      send_SMS = true;
+  //      send_mail = true;
+  //      publish();
+  //    }
+  //  }
+
   switch (current_state)
   {
     case PRE_STARTUP:
