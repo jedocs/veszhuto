@@ -131,6 +131,10 @@ void i2c_scan();
 #define STARTUP_DELAY   10 //*********************************************
 #define PUMP_STARTUP_DELAY  6
 
+
+
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#ifdef fehervar
 //state machine
 #define PRE_STARTUP 0
 #define STARTUP   1
@@ -154,6 +158,39 @@ void i2c_scan();
 #define STW_WAIT_FOR_DIVERTER_WATER 1
 #define STW_OPEN_BYPASS    2
 #define STW_WAIT_FOR_BYPASS_OPEN  3
+
+#else
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#define PRE_STARTUP 0
+#define STARTUP   1
+#define SYNC_VALVES 2
+#define SWITCH_TO_COOLER  3
+#define RUN_ON_COOLER 4
+#define SWITCH_TO_WATER 5
+#define RUN_ON_WATER 6
+#define ERROR_  7
+#define ERROR_WAIT 8
+#define WAIT_FOR_AC 9
+
+#define STC_SWITCH_TO_COOLER    0
+#define STC_WAIT_FOR_VALVES   1
+#define STC_WAIT_FOR_FLOW 2
+
+#define STW_SWITCH_TO_WATER 0
+#define STW_WAIT_FOR_VALVES 1
+
+#define SV_SYNC_TO_COOLER 0
+#define SV_WAIT_FOR_COOLER 1
+#define SV_SYNC_TO_WATER 2
+#define SV_WAIT_FOR_WATER 3
+#define SV_WAIT_FOR_FLOW 4
+
+
+
+#endif
+
+
+
 
 #define PRI_FWD_THRESH  15
 #define SEC_FWD_THRESH  19

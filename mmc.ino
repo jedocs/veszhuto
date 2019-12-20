@@ -44,6 +44,7 @@ unsigned char publish_data_counter = 0;
 unsigned char current_state = PRE_STARTUP;
 unsigned char switch_to_cooler_status = 0;
 unsigned char switch_to_water_status = 0;
+unsigned char sync_valves_status = 0;
 unsigned char current_state_bak = 0;
 unsigned char switch_to_cooler_status_bak = 0;
 unsigned char switch_to_water_status_bak = 0;
@@ -88,7 +89,7 @@ const unsigned int io_0_debounce_periods[16] =
   //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
 { 8000, 0, 0, 0, 0, 10, 10, 0,
   //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
-  10, 10, 10, 10, 10, 5000, 5000, 10
+  10, 10, 10, 10, 10, 2000, 2000, 10
 };
 
 const unsigned int io_7_debounce_periods[16] =
@@ -109,7 +110,7 @@ double B = 0.00027785289284365956;
 double C = 9.627280482149224e-8;
 
 String publish_info;
-String info;
+//String info;
 String command;
 String lcdinfo;
 
@@ -129,8 +130,8 @@ struct publish_data {
   float pri_return_temp;
   float sec_fwd_temp;
   float sec_return_temp;
-  int water_meter;
-  int vbat;
+  float water_meter;
+  float vbat;
   float reset_reason;
   int status_code;
 };
@@ -315,11 +316,11 @@ void setup()
 
   Wire.begin(I2C_SDA, I2C_SCL);
   bool   isOk = setPowerBoostKeepOn(1);
-  info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
-  SerialMon.println(info);
+//  info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
+  //SerialMon.println(info);
 
   lcd.setCursor(0, 3);
-  lcd.print(info);
+  //lcd.print(info);
 
   SPI.begin (SCK, MISO, MOSI, AN_CS);
 }
@@ -342,7 +343,7 @@ void loop()
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
-   // io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
+    // io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
 
     start_ADC_counter++;
     publish_data_counter++;
@@ -356,26 +357,26 @@ void loop()
     }
 
     //if ((io_7_inputs >> PB_B) & 0x1) {
-      if (WD_state) {
-        digitalWrite(WD, LOW);
-        WD_state = false;
-        if (takeover_valves) {
-          io_0.digitalWrite(CTRL_PULSE, LOW);
-          digitalWrite(MMV_TRIG, LOW);
-        }
+    if (WD_state) {
+      digitalWrite(WD, LOW);
+      WD_state = false;
+      if (takeover_valves) {
+        io_0.digitalWrite(CTRL_PULSE, LOW);
+        digitalWrite(MMV_TRIG, LOW);
       }
-      else {
-        digitalWrite(WD, HIGH);
-        WD_state = true;
-        if (takeover_valves) {
-          io_0.digitalWrite(CTRL_PULSE, HIGH);
-          digitalWrite(MMV_TRIG, HIGH);
-        }
+    }
+    else {
+      digitalWrite(WD, HIGH);
+      WD_state = true;
+      if (takeover_valves) {
+        io_0.digitalWrite(CTRL_PULSE, HIGH);
+        digitalWrite(MMV_TRIG, HIGH);
       }
+    }
     //}
-    
+
     State_Machine();
-       
+
     if (!ac_status) {
       if ((io_7_inputs >> PB_B) & 0x1) {
         lcd.setBacklight(255);
@@ -384,12 +385,12 @@ void loop()
         lcd.setBacklight(0);
       }
     }
-        
+
     if (!AC_OK) {
       if (ac_status) {
         ac_status = false;
         Serial.println ("nincs áram!!");
-        publish_info += "nincs aram\n";
+        publish_info = "nincs aram\n";
         publish_info += SITE;
         publish_info += " tavfelugyelet";
         send_SMS = true;
@@ -402,7 +403,7 @@ void loop()
       if (!ac_status) {
         ac_status = true;
         Serial.println ("van aram");
-        publish_info += "van aram\n";
+        publish_info = "van aram\n";
         publish_info += SITE;
         publish_info += " tavfelugyelet";
         send_SMS = true;
@@ -411,13 +412,13 @@ void loop()
         lcd.setBacklight(255);
       }
     }
-        
+
     //kompresszor megy?
     if (!COMPR_OK) {
       if (compr_status) {
         compr_status = false;
         Serial.println ("A kompresszor nem megy!!");
-        publish_info += "A kompresszor LEALLT!\n";
+        publish_info = "A kompresszor LEALLT!\n";
         publish_info += SITE;
         publish_info += " tavfelugyelet";
         send_SMS = true;
@@ -429,7 +430,7 @@ void loop()
       if (!compr_status) {
         compr_status = true;
         Serial.println ("A kompresszor elindult");
-        publish_info += "A kompresszor elindult\n";
+        publish_info = "A kompresszor elindult\n";
         publish_info += SITE;
         publish_info += " tavfelugyelet";
         send_SMS = true;
@@ -473,6 +474,20 @@ void ReadInputs(void) {
           if ((millis() - io_0_lastchange[i]) > io_0_debounce_periods[i]) {
             bitWrite(io_0_inputs, i, (current_io_0 &  mask));
             //Serial.println("io0." + String(i) + " changed to " + String((io_0_inputs &  mask) >> i) + "\n");
+            if (i == WATER_PULSE) {
+              long timestamp = millis();
+              if ((io_0_inputs >> WATER_PULSE) & 1) { //water meter pulse detected
+                long timediff = timestamp - prev_pulse;
+                prev_pulse = timestamp;
+                if ((timediff < 60000) & (timediff > 600)) {
+                  water_flow = 60000.0 / timediff;
+                  //Serial.println("flow: " + String(water_flow));
+                }
+                else water_flow = 0;
+                //Serial.println("flow: " + String(water_flow));
+              }
+            }
+
           }
         }
       }
@@ -489,19 +504,6 @@ void ReadInputs(void) {
             bitWrite(io_7_inputs, i, (current_io_7 &  mask));
             //Serial.println("io7." + String(i) + " changed to " + String((io_7_inputs &  mask) >> i) + "\n");
 
-            if (i == WATER_PULSE) {
-              long timestamp = millis();
-              if ((io_0_inputs >> WATER_PULSE) & 1) { //water meter pulse detected
-                long timediff = timestamp - prev_pulse;
-                prev_pulse = timestamp;
-                if ((timediff < 60000) & (timediff > 600)) {
-                  water_flow = 60000.0 / timediff;
-                  Serial.println("flow: " + String(water_flow));
-                }
-                else water_flow = 0;
-                Serial.println("flow: " + String(water_flow));
-              }
-            }
           }
         }
       }
@@ -528,7 +530,7 @@ void ADC() {
     digitalWrite(AN_CS, LOW);    // SS is pin 10
     SPI.transfer (0x10);  //reset ADC
     digitalWrite(AN_CS, HIGH);
-    info += "ADC hiba 1\n";
+    //info += "ADC hiba 1\n";
     return;
   }
 
@@ -543,7 +545,7 @@ void ADC() {
     digitalWrite(AN_CS, LOW);    // SS is pin 10
     SPI.transfer (0x10);  //reset ADC
     digitalWrite(AN_CS, HIGH);
-    info += "ADC hiba 2\n";
+    //info += "ADC hiba 2\n";
     return;
   }
 
@@ -565,6 +567,7 @@ void ADC() {
   //info = "sec1: " + String(sec_fwd_temp) + ", ";
   //info += "pri1: " + String(pri_fwd_temp) + "\n";
 
+#ifdef fehervar
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("p e/v: " + String(pri_fwd_temp) + "C/" + String(pri_return_temp) + "C");
@@ -575,7 +578,19 @@ void ADC() {
 
   lcd.setCursor(0, 3);
   lcd.print("flow: " + String(water_flow) + " l/p");
-  
+#else
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("p/s e: " + String(pri_fwd_temp) + "C/" + String(sec_fwd_temp) + "C");
+  lcd.setCursor(0, 1);
+  lcd.print("visszatero: " + String(pri_return_temp) + "C");
+  lcd.setCursor(0, 2);
+  lcd.print("room temp: " + String(room_temp) + "C");
+
+  lcd.setCursor(0, 3);
+  lcd.print("flow: " + String(water_flow) + " l/p");
+#endif
+
   //appendFile(SD, "/temp_log.txt", info.c_str());
 }
 
@@ -646,11 +661,8 @@ void command_interpreter() {
 //***********************************************************
 void publish()
 {
-  // if (send_SMS) {
-  // Serial.println("\n\n!!!!!!!!!!!!!! send SMS !!!!!!!!!!!!!!");
-  // Serial.println(publish_info);
-  //}
-  SerialMon.println("send data to queue");
+ 
+  SerialMon.println("start publish");
   if (queue == NULL) {
     SerialMon.println("queue is NULL in main loop");
     //reset?????!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -663,7 +675,11 @@ void publish()
   data_to_publish.sec_return_temp = room_temp;//sec_return_temp;
   data_to_publish.water_meter = compressor_current;//water_flow;
   data_to_publish.reset_reason = reset_reason;
+  #ifdef fehervar
   data_to_publish.vbat = pump_current;//bat_voltage;
+  #else
+  data_to_publish.vbat = water_flow;//bat_voltage;
+  #endif
   int status_code;
   bitWrite(status_code, 0, SMS_OK);
   bitWrite(status_code, 1, BYPASS_STUCK);
@@ -739,68 +755,6 @@ bool setPowerBoostKeepOn(int en)
 }
 
 
-void sm1(void) {
-
-  switch (current_state)
-  {
-    case 0 :
-      io_0.digitalWrite(DIVERTER_VALVE, 1);
-      current_state = 1;
-      break;
-    case 1:
-      //lcd.setCursor(0, 0);
-      //lcd.print("SSR on ");
-      //lcd.setCursor(0, 2);
-      //lcd.print("PUMP on ");
-      io_0.digitalWrite(SSR, 0);
-      io_0.digitalWrite(PUMP, 0);
-      current_state = 2;
-      break;
-
-    case 2 :
-      //lcd.setCursor(0, 0);
-      //lcd.print("SSR on ");
-      //lcd.setCursor(0, 2);
-      //lcd.print("PUMP off");
-      io_0.digitalWrite(SSR, 0);
-      io_0.digitalWrite(PUMP, 1);
-      current_state = 3;
-      break;
-    case 3 :
-      current_state = 4;
-      break;
-    case 4 :
-      io_0.digitalWrite(BYPASS_VALVE, 0);
-      current_state = 5;
-      break;
-    case 5 :
-
-      current_state = 6;
-      break;
-    case 6 :
-      //lcd.setCursor(0, 0);
-      //lcd.print("SSR off");
-      //lcd.setCursor(0, 2);
-      //lcd.print("PUMP off");
-      io_0.digitalWrite(SSR, 1);
-      io_0.digitalWrite(PUMP, 1);
-      current_state = 7;
-      break;
-    case 7 :
-      io_0.digitalWrite(DIVERTER_VALVE, 0);
-      current_state = 8;
-      break;
-    case 8 :
-      io_0.digitalWrite(BYPASS_VALVE, 1);
-      current_state = 9;
-      break;
-    case 9 :
-
-      current_state = 0;
-      break;
-
-  }
-}
 
 /*
      if (!SD.begin(SD_CS)) {

@@ -36,7 +36,7 @@ void TaskGSM(void *pvParameters) {
       if (wait_text) {
         if (msg.startsWith("restart")) {
           Serial.println("restart parancs");
-          // ESP.restart();
+          ESP.restart();
         }
         else if (msg.startsWith("stop")) {
           Serial.println("stop parancs");
@@ -61,7 +61,7 @@ void TaskGSM(void *pvParameters) {
 
     if (xQueueReceive(queue, &data_for_publish, 0)) {
       // modem.restart();
-      //Serial.println("   time: " + modem.getGSMDateTime(DATE_TIME));
+      Serial.println("queue received data");
 
       if (send_SMS) {
         Serial.println("sending sms from gsm task");
@@ -146,11 +146,12 @@ void TaskGSM(void *pvParameters) {
 
       if (send_mail) {
         modem.SendEmail(apn, publish_info);
-        info = "";
+//        info = "";
         send_mail = false;
         //delay(10000);
       }
     }
+   // publish_info="";
     delay(200);
   }
 }

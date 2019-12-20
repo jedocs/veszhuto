@@ -401,6 +401,7 @@ void State_Machine(void) {
         }
         //lcd.clear();
         lcd.print(lcdinfo);
+        lcdinfo = "";
       }
 
       break;
@@ -517,7 +518,7 @@ void State_Machine(void) {
               info += "Aktualis uzemmod: csapviz.\n";
               //Serial.println("*************info**************");
               //Serial.println(info);
-              publish_info += info;
+              publish_info += info; infokat felülvizsgálni, nehogy overflow legyen a += miatt
               send_SMS = true;
               send_mail = true;
               publish();
