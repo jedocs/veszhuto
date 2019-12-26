@@ -33,6 +33,7 @@ void TaskGSM(void *pvParameters) {
 
     if (SerialAT.available()) {
       String msg = SerialAT.readStringUntil('\n');
+
       if (wait_text) {
         if (msg.startsWith("restart")) {
           Serial.println("restart parancs");
@@ -63,7 +64,7 @@ void TaskGSM(void *pvParameters) {
       // modem.restart();
       Serial.println("queue received data");
 
-      if (send_SMS) {
+      if (0) { //send_SMS) {
         Serial.println("sending sms from gsm task");
         if (modem.sendSMS(SMS_TARGET, publish_info)) {
           SerialMon.println(publish_info);
@@ -74,9 +75,9 @@ void TaskGSM(void *pvParameters) {
           //send_SMS = false;
         }
       }
-      else{
+      else {
         publish_info = "";
-        }
+      }
 
       SerialMon.print("Connecting to APN: ");
       SerialMon.print(apn);
@@ -146,12 +147,12 @@ void TaskGSM(void *pvParameters) {
 
       if (send_mail) {
         modem.SendEmail(apn, publish_info);
-//        info = "";
+        //        info = "";
         send_mail = false;
         //delay(10000);
       }
     }
-   // publish_info="";
+    // publish_info="";
     delay(200);
   }
 }

@@ -14,6 +14,7 @@
 #include "pwds.h"
 #include <rom/rtc.h>
 #include "ThingSpeak.h"
+#include "SerialSniffer.h"
 
 #define TINY_GSM_MODEM_HAS_GPRS
 #define TINY_GSM_MODEM_HAS_SSL
@@ -137,14 +138,17 @@ struct publish_data {
 };
 
 QueueHandle_t queue;
-//#define DUMP_AT_COMMANDS
-#ifdef DUMP_AT_COMMANDS
-#include <StreamDebugger.h>
-StreamDebugger debugger(SerialAT, SerialMon);
-TinyGsm modem(debugger);
-#else
-TinyGsm modem(SerialAT);
-#endif
+////#define DUMP_AT_COMMANDS
+//#ifdef DUMP_AT_COMMANDS
+//#include <StreamDebugger.h>
+//StreamDebugger debugger(SerialAT, SerialMon);
+//TinyGsm modem(debugger);
+//#else
+//TinyGsm modem(SerialAT);
+//#endif
+
+SerialSniffer sniffer(SerialAT, SerialMon);
+TinyGsm modem(sniffer);
 
 Adafruit_MCP23017 io_0;
 Adafruit_MCP23017 io_7;
