@@ -1010,7 +1010,29 @@ class TinyGsmSim800
             }
             data = "";
             DBG("### Got Data:", len, "on", mux);
-          } else if (data.endsWith(GF("CLOSED" GSM_NL))) {
+          }
+
+          //SMS rx ************************************
+          else if (data.endsWith(GF(GSM_NL "+CMT: \""))) {
+            Serial.println("SMS jött");
+            String phoneno = stream.readStringUntil('\"');
+            if (phoneno.endsWith(NO1) or phoneno.endsWith(NO2)) {
+              String dummmy = stream.readStringUntil('\n'); //skip date/time
+              String command = stream.readStringUntil('\r');
+              Serial.println("SMS jött, telszám:" + phoneno);
+              Serial.println("SMS jött, parancs:" + command);
+              if (command == "restart") {
+                ESP.restart();
+              }
+            }
+
+            data = "";
+
+          }
+          // ******************************************
+
+
+          else if (data.endsWith(GF("CLOSED" GSM_NL))) {
             int nl = data.lastIndexOf(GSM_NL, data.length() - 8);
             int coma = data.indexOf(',', nl + 2);
             int mux = data.substring(nl + 2, coma).toInt();

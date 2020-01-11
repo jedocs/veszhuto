@@ -52,6 +52,7 @@ unsigned char switch_to_water_status_bak = 0;
 unsigned char run_time = 0;
 
 int startup_delay = STARTUP_DELAY;
+int pri_flow_nok = 0;
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -90,7 +91,7 @@ const unsigned int io_0_debounce_periods[16] =
   //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
 { 8000, 0, 0, 0, 0, 10, 10, 0,
   //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
-  10, 10, 10, 10, 10, 2000, 2000, 10
+  10, 10, 10, 10, 10, 5000, 5000, 10
 };
 
 const unsigned int io_7_debounce_periods[16] =
@@ -148,7 +149,7 @@ QueueHandle_t queue;
 //#endif
 
 SerialSniffer sniffer(SerialAT, SerialMon);
-TinyGsm modem(sniffer);
+TinyGsm modem(SerialAT);//sniffer);
 
 Adafruit_MCP23017 io_0;
 Adafruit_MCP23017 io_7;
@@ -320,7 +321,7 @@ void setup()
 
   Wire.begin(I2C_SDA, I2C_SCL);
   bool   isOk = setPowerBoostKeepOn(1);
-//  info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
+  //  info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
   //SerialMon.println(info);
 
   lcd.setCursor(0, 3);
@@ -338,21 +339,56 @@ void loop()
 {
   ReadInputs();
 
-  io_7.digitalWrite(RED_LED, BYPASS_CLOSED);
-  io_7.digitalWrite(GREEN_LED, DIVERTER_ON_COOLER);
+  io_7.digitalWrite(RED_LED, (io_7_inputs >> PB1) & 0x1);
+  io_7.digitalWrite(GREEN_LED, (io_7_inputs >> PB2) & 0x1);
   io_7.digitalWrite(ORANGE_LED, PRI_FLOW_OK);
+
+  if (!AC_OK) {
+    if (ac_status) {
+      ac_status = false;
+      Serial.println ("nincs áram!!");
+      publish_info = "nincs aram\n";
+      publish_info += SITE;
+      publish_info += " tavfelugyelet";
+      send_SMS = true;
+      send_mail = true;
+      publish();
+      lcd.setBacklight(0);
+    }
+  }
+  else {
+    if (!ac_status) {
+      ac_status = true;
+      Serial.println ("van aram");
+      publish_info = "van aram\n";
+      publish_info += SITE;
+      publish_info += " tavfelugyelet";
+      send_SMS = true;
+      send_mail = true;
+      publish();
+      lcd.setBacklight(255);
+    }
+  }
+  if (!ac_status) {
+    if ((io_7_inputs >> PB_B) & 0x1) {
+      lcd.setBacklight(255);
+    }
+    else {
+      lcd.setBacklight(0);
+    }
+  }
 
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
-    // io_7.digitalWrite(PB_LED, !io_7.digitalRead(PB_LED));
-
     start_ADC_counter++;
+    if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
     publish_data_counter++;
-
     //********************** state machine lockup prevention!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    State_Machine();
+
     if (takeover_valves) {
       digitalWrite(MMV_RESET, HIGH); //enable ctrl relay mmv
     }
@@ -360,7 +396,7 @@ void loop()
       digitalWrite(MMV_RESET, LOW);
     }
 
-    //if ((io_7_inputs >> PB_B) & 0x1) {
+    //if ((io_7_inputs >> PB1) & 0x1) {
     if (WD_state) {
       digitalWrite(WD, LOW);
       WD_state = false;
@@ -379,43 +415,6 @@ void loop()
     }
     //}
 
-    State_Machine();
-
-    if (!ac_status) {
-      if ((io_7_inputs >> PB_B) & 0x1) {
-        lcd.setBacklight(255);
-      }
-      else {
-        lcd.setBacklight(0);
-      }
-    }
-
-    if (!AC_OK) {
-      if (ac_status) {
-        ac_status = false;
-        Serial.println ("nincs áram!!");
-        publish_info = "nincs aram\n";
-        publish_info += SITE;
-        publish_info += " tavfelugyelet";
-        send_SMS = true;
-        send_mail = true;
-        publish();
-        lcd.setBacklight(0);
-      }
-    }
-    else {
-      if (!ac_status) {
-        ac_status = true;
-        Serial.println ("van aram");
-        publish_info = "van aram\n";
-        publish_info += SITE;
-        publish_info += " tavfelugyelet";
-        send_SMS = true;
-        send_mail = true;
-        publish();
-        lcd.setBacklight(255);
-      }
-    }
 
     //kompresszor megy?
     if (!COMPR_OK) {
@@ -442,10 +441,26 @@ void loop()
         publish();
       }
     }
-  }
 
-  if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
-  if (publish_data_counter > PUBLISH_DATA_THRESHOLD) publish();
+    if (publish_data_counter > PUBLISH_DATA_THRESHOLD) {
+      publish();
+      if (!((current_io_0 >> PRI_FLOW) & 0x1)) {
+        pri_flow_nok = 0;
+      }
+    }
+
+
+    if ((current_io_0 >> PRI_FLOW) & 0x1){
+    //if (!PRI_FLOW_OK) {
+      pri_flow_nok += 1;
+    }
+    //    else {
+    //      //if (pri_flow_nok > 0) {
+    //
+    //      // }
+    //      pri_flow_nok = 0;
+    //    }
+  }
   if (SerialMon.available()) command_interpreter();
 }
 
@@ -665,7 +680,7 @@ void command_interpreter() {
 //***********************************************************
 void publish()
 {
- 
+
   SerialMon.println("start publish");
   if (queue == NULL) {
     SerialMon.println("queue is NULL in main loop");
@@ -676,14 +691,14 @@ void publish()
   data_to_publish.pri_fwd_temp = pri_fwd_temp;
   data_to_publish.pri_return_temp = pri_return_temp;
   data_to_publish.sec_fwd_temp = sec_fwd_temp;
-  data_to_publish.sec_return_temp = room_temp;//sec_return_temp;
+  data_to_publish.sec_return_temp = pri_flow_nok;//room_temp;//sec_return_temp;
   data_to_publish.water_meter = compressor_current;//water_flow;
   data_to_publish.reset_reason = reset_reason;
-  #ifdef fehervar
+#ifdef fehervar
   data_to_publish.vbat = pump_current;//bat_voltage;
-  #else
+#else
   data_to_publish.vbat = water_flow;//bat_voltage;
-  #endif
+#endif
   int status_code;
   bitWrite(status_code, 0, SMS_OK);
   bitWrite(status_code, 1, BYPASS_STUCK);

@@ -152,7 +152,7 @@ void sync_valves(void)
         io_0.digitalWrite(SSR , OFF); //SSR off
 
         if (BYPASS_OPEN & DIVERTER_ON_WATER) {
-          startup_delay = 5;
+          startup_delay = 7;
           sync_valves_status = SV_WAIT_FOR_FLOW; //***********************************
           break;
         }

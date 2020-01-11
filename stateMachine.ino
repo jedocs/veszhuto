@@ -44,7 +44,7 @@ void State_Machine(void) {
       if ((old_bypass_pos != BYPASS_OPEN) | (old_diverter_pos != DIVERTER_ON_WATER)) {
         old_bypass_pos = BYPASS_OPEN;
         old_diverter_pos = DIVERTER_ON_WATER;
-        startup_delay = 10;
+        startup_delay = STARTUP_DELAY;
         break;
       }
 

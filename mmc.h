@@ -128,7 +128,7 @@ unsigned int read_SPI();
 void i2c_scan();
 #define RUN_TIME_LIMIT 20
 
-#define STARTUP_DELAY   10 //*********************************************
+#define STARTUP_DELAY  10 //*********************************************
 #define PUMP_STARTUP_DELAY  6
 
 

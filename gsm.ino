@@ -32,39 +32,42 @@ void TaskGSM(void *pvParameters) {
     //    }
 
     if (SerialAT.available()) {
-      String msg = SerialAT.readStringUntil('\n');
 
-      if (wait_text) {
-        if (msg.startsWith("restart")) {
-          Serial.println("restart parancs");
-          ESP.restart();
-        }
-        else if (msg.startsWith("stop")) {
-          Serial.println("stop parancs");
-        }
-        else {
-          Serial.println("ismeretlen parancs");
-          Serial.println(msg);
-        }
-        wait_text = false;
-      }
-      else {
-        if (msg.startsWith("+CMT: \"+36204328253\"")) {
-          Serial.println("SMS jött");
-          wait_text = true;
-        }
-        else {
-          Serial.println(msg);
-        }
-        Serial.println("received sg\n");
-      }
+      modem.waitResponse();
+      //
+      //      String msg = SerialAT.readStringUntil('\n');
+      //
+      //      if (wait_text) {
+      //        if (msg.startsWith("restart")) {
+      //          Serial.println("restart parancs");
+      //          ESP.restart();
+      //        }
+      //        else if (msg.startsWith("stop")) {
+      //          Serial.println("stop parancs");
+      //        }
+      //        else {
+      //          Serial.println("ismeretlen parancs");
+      //          Serial.println(msg);
+      //        }
+      //        wait_text = false;
+      //      }
+      //      else {
+      //        if (msg.startsWith("+CMT: \"+36204328253\"")) {
+      //          Serial.println("SMS jött");
+      //          wait_text = true;
+      //        }
+      //        else {
+      //          Serial.println(msg);
+      //        }
+      //        Serial.println("received sg\n");
+      //      }
     }
 
     if (xQueueReceive(queue, &data_for_publish, 0)) {
       // modem.restart();
       Serial.println("queue received data");
 
-      if (0) { //send_SMS) {
+      if (send_SMS) {
         Serial.println("sending sms from gsm task");
         if (modem.sendSMS(SMS_TARGET, publish_info)) {
           SerialMon.println(publish_info);

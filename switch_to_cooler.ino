@@ -80,7 +80,7 @@ void switch_to_cooler(void)
         io_0.digitalWrite(SSR , OFF); //SSR off
 
         if (BYPASS_CLOSED & DIVERTER_ON_COOLER) {
-          startup_delay = 5;
+          startup_delay = 7;
           switch_to_cooler_status = STC_WAIT_FOR_FLOW;
           //***********************************
 #ifdef debug
