@@ -518,7 +518,7 @@ void State_Machine(void) {
               info += "Aktualis uzemmod: csapviz.\n";
               //Serial.println("*************info**************");
               //Serial.println(info);
-              publish_info += info; infokat felülvizsgálni, nehogy overflow legyen a += miatt
+              publish_info += info; //infokat felülvizsgálni, nehogy overflow legyen a += miatt
               send_SMS = true;
               send_mail = true;
               publish();
@@ -566,14 +566,14 @@ void State_Machine(void) {
     case ERROR_WAIT:
       break;
 
-    case WAIT_FOR_AC:
-      if (AC_OK) {
-        old_bypass_pos = BYPASS_OPEN;
-        old_diverter_pos = DIVERTER_ON_WATER;
-        info += "Aramellatas ok, ujraindulas\n";
-        current_state = STARTUP;
-      }
-      break;
+//    case WAIT_FOR_AC:
+//      if (AC_OK) {
+//        old_bypass_pos = BYPASS_OPEN;
+//        old_diverter_pos = DIVERTER_ON_WATER;
+//        info += "Aramellatas ok, ujraindulas\n";
+//        current_state = STARTUP;
+//      }
+//      break;
     default :
       Serial.println ("switch - case hiba");
   }

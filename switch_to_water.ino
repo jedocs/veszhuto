@@ -1,3 +1,4 @@
+#if defined (mmc) || defined (szolnok)
 void switch_to_water(void)
 {
   switch (switch_to_water_status) {
@@ -105,3 +106,5 @@ void switch_to_water(void)
       }
   }
 }
+
+#endif

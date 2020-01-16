@@ -1,3 +1,4 @@
+#if defined (mmc) || defined (szolnok)
 void switch_to_cooler(void)
 {
 
@@ -131,3 +132,5 @@ void switch_to_cooler(void)
       break;
   }
 }
+
+#endif

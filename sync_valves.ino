@@ -1,3 +1,4 @@
+#if defined (mmc) || defined (szolnok)
 void sync_valves(void)
 {
   switch (sync_valves_status) {
@@ -194,3 +195,5 @@ void sync_valves(void)
 
   }
 }
+
+#endif

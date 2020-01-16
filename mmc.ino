@@ -14,7 +14,7 @@
 #include "pwds.h"
 #include <rom/rtc.h>
 #include "ThingSpeak.h"
-#include "SerialSniffer.h"
+//#include "SerialSniffer.h"
 
 #define TINY_GSM_MODEM_HAS_GPRS
 #define TINY_GSM_MODEM_HAS_SSL
@@ -112,7 +112,7 @@ double B = 0.00027785289284365956;
 double C = 9.627280482149224e-8;
 
 String publish_info;
-//String info;
+String info;
 String command;
 String lcdinfo;
 
@@ -148,7 +148,7 @@ QueueHandle_t queue;
 //TinyGsm modem(SerialAT);
 //#endif
 
-SerialSniffer sniffer(SerialAT, SerialMon);
+//SerialSniffer sniffer(SerialAT, SerialMon);
 TinyGsm modem(SerialAT);//sniffer);
 
 Adafruit_MCP23017 io_0;
@@ -450,8 +450,8 @@ void loop()
     }
 
 
-    if ((current_io_0 >> PRI_FLOW) & 0x1){
-    //if (!PRI_FLOW_OK) {
+    if ((current_io_0 >> PRI_FLOW) & 0x1) {
+      //if (!PRI_FLOW_OK) {
       pri_flow_nok += 1;
     }
     //    else {
@@ -691,12 +691,14 @@ void publish()
   data_to_publish.pri_fwd_temp = pri_fwd_temp;
   data_to_publish.pri_return_temp = pri_return_temp;
   data_to_publish.sec_fwd_temp = sec_fwd_temp;
-  data_to_publish.sec_return_temp = pri_flow_nok;//room_temp;//sec_return_temp;
+
   data_to_publish.water_meter = compressor_current;//water_flow;
   data_to_publish.reset_reason = reset_reason;
 #ifdef fehervar
+  data_to_publish.sec_return_temp = water_flow;//room_temp;//sec_return_temp;
   data_to_publish.vbat = pump_current;//bat_voltage;
 #else
+  data_to_publish.sec_return_temp = pri_flow_nok;//room_temp;//sec_return_temp;
   data_to_publish.vbat = water_flow;//bat_voltage;
 #endif
   int status_code;
