@@ -613,7 +613,6 @@ class TinyGsmSim800
         Serial.println("sapbr contype hiba");
       }
 
-      //sendAT("+sapbr=3,1,\"APN\",\"internet.telekom\"");
       sendAT(GF("+SAPBR=3,1,\"APN\",\""), apn, '"');
       if (waitResponse() != 1) {
         Serial.println("sapbr APN hiba");
@@ -669,17 +668,12 @@ class TinyGsmSim800
       }
       Serial.println("mehet");
 
-
-      //sendAT(text);
       stream.print(text);
       stream.flush();
       if (waitResponse() != 1) {
         Serial.println("stream print hiba");
       }
       Serial.println("ment");
-      //delay(100);
-
-      //waitResponse();
       sendAT("+smtpsend");
       Serial.println("sent");
       delay(10000);

@@ -1,3 +1,6 @@
+#define TINY_GSM_MODEM_HAS_GPRS
+#define TINY_GSM_MODEM_HAS_SSL
+
 // TTGO T-Call pins
 #define MODEM_RST            5
 #define MODEM_PWKEY          4
@@ -106,15 +109,15 @@
 
 #define SMS
 
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
-void createDir(fs::FS &fs, const char * path);
-void removeDir(fs::FS &fs, const char * path);
-void readFile(fs::FS &fs, const char * path);
-void writeFile(fs::FS &fs, const char * path, const char * message);
-void appendFile(fs::FS &fs, const char * path, const char * message);
-void renameFile(fs::FS &fs, const char * path1, const char * path2);
-void deleteFile(fs::FS &fs, const char * path);
-void testFileIO(fs::FS &fs, const char * path);
+//void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
+//void createDir(fs::FS &fs, const char * path);
+//void removeDir(fs::FS &fs, const char * path);
+//void readFile(fs::FS &fs, const char * path);
+//void writeFile(fs::FS &fs, const char * path, const char * message);
+//void appendFile(fs::FS &fs, const char * path, const char * message);
+//void renameFile(fs::FS &fs, const char * path1, const char * path2);
+//void deleteFile(fs::FS &fs, const char * path);
+//void testFileIO(fs::FS &fs, const char * path);
 void ReadInputs(void);
 void State_Machine(void);
 void command_interpreter(void);
