@@ -1,3 +1,6 @@
+//3percet bír
+
+
 #include <LiquidCrystal_PCF8574.h>
 
 //no sec flow -> SMS

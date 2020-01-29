@@ -224,6 +224,7 @@ void State_Machine(void) {
       takeover_valves = false;
 
       //info = +"\n**************ERROR******************";
+      publish_info += " **** ERROR ****";
       send_SMS = true;
       send_mail = true;
       publish();
