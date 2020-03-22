@@ -1,4 +1,5 @@
 void sync_valves(void)
+
 {
   switch (sync_valves_status) {
 

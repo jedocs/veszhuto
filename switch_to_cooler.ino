@@ -1,4 +1,5 @@
 void switch_to_cooler(void)
+
 {
 
   switch (switch_to_cooler_status) {
