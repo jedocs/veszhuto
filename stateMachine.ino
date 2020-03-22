@@ -18,10 +18,6 @@ void State_Machine(void) {
 #endif
       old_bypass_pos = BYPASS_OPEN;
       old_diverter_pos = DIVERTER_ON_WATER;
-      //  info = "A veszhuto uraindult. RR0.RR1: " + String(reset_reason) + "\n";
-      lcd.setCursor(0, 3);
-      //      lcd.print(info);
-
       current_state = STARTUP;
 #ifdef debug
       Serial.println("current state=startup");
@@ -33,8 +29,16 @@ void State_Machine(void) {
       Serial.println("startup");
 #endif
       Serial.println ("starting up " + String(startup_delay));
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("   inicializalas");
+      lcd.setCursor(0, 2);
+      lcd.print("kesleltetes: " + String(startup_delay) + " sec");
       lcd.setCursor(0, 3);
-      lcd.print("starting up " + String(startup_delay));
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
 
       startup_delay--;
       if (startup_delay > 0) {
@@ -54,16 +58,30 @@ void State_Machine(void) {
       Serial.println(String((BYPASS_OPEN ? "bypass NYITVA" : "bypass ZÁRVA")));
       Serial.println(String((DIVERTER_ON_COOLER ? "váltószelep VÍZHŰTŐ" : "váltószelep CSAPVÍZ")));
 
-      //info += String((BYPASS_OPEN ? "bypass nyitva, " : "bypass zarva, ")) + String((DIVERTER_ON_COOLER ? "valtoszelep vizhuto\n" : "valtoszelep csapviz\n"));
-
       if (BYPASS_RUN | DIVERTER_RUN) { //szelep hiba
         if (BYPASS_RUN) {
           SerialMon.println("bypass szelep megy pedig nem kéne!");
-          //info += "bypass szelep megy pedig nem kene!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep mozog (?)");
         }
         if (DIVERTER_RUN) {
           SerialMon.println("diverter szelep megy pedig nem kéne!");
-          //info += "diverter szelep megy pedig nem kene!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep mozog (?)");
         }
         current_state = ERROR_;
 #ifdef debug
@@ -71,11 +89,18 @@ void State_Machine(void) {
 #endif
         break;
       }
-
       takeover_valves = true;
       delay(20);
       SerialMon.println("szelepvezérlés átvéve");
-      //info+="szelepvezerles atveve\n"
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("   inicializalas");
+      lcd.setCursor(0, 2);
+      lcd.print("szelepvezerles aktiv");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
 
       if (DIVERTER_ON_COOLER != BYPASS_CLOSED) {
         if (DIVERTER_ON_COOLER) {
@@ -102,7 +127,6 @@ void State_Machine(void) {
           if ((pri_fwd_temp < PRI_FWD_THRESH) & (PRI_FLOW_OK)) {
             SerialMon.println("primer előremenő hőmérséklet OK, " + String(pri_fwd_temp) + "C");
             SerialMon.println("primer átfolyás OK");
-            //info += "primer eloremeno hom.: " + String(pri_fwd_temp) + "C, atfolyas OK\n";
 
             Serial.println ("átállás vízhűtőre!!");
             publish_info = "Atallas vizhutore!\n";
@@ -123,6 +147,7 @@ void State_Machine(void) {
             break;
           }
           else {
+            current_state = RUN_ON_WATER;
             break;
           }
         }
@@ -145,13 +170,21 @@ void State_Machine(void) {
 #ifdef debug
       Serial.println("run on cooler");
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("uzemmod: vizhuto");
+      lcd.setCursor(0, 1);
+      lcd.print("eloremeno: " + String(pri_fwd_temp) + "C");
+      lcd.setCursor(0, 2);
+      lcd.print("visszatero: " + String(pri_return_temp) + "C");
+      lcd.setCursor(0, 3);
+      lcd.print("helyiseg: " + String(room_temp) + "C");
 
       if (!(io_0.digitalRead(AC_MONITOR))  & AC_OK) {
 #ifdef debug
         Serial.println("roc ac ok");
 #endif
         if ((pri_fwd_temp > PRI_FWD_THRESH) | !PRI_FLOW_OK) { //
-
 #ifdef debug
           if (pri_fwd_temp > PRI_FWD_THRESH) {
             Serial.println("temp above thresh" + String(pri_fwd_temp));
@@ -160,10 +193,6 @@ void State_Machine(void) {
             Serial.println("pri flow nok");
           }
 #endif
-          //info = "Vizhuto uzemmod hiba! Primer eloremeno hom.: " + String(pri_fwd_temp) + "C, ";
-          //info += "szekunder eloremeno hom.: " + String(sec_fwd_temp) + "C, ";
-
-          //info += "Atallas csapvizre\n";
           io_0.digitalWrite(SSR, OFF);
           Serial.println ("átállás csapvízre!!");
           publish_info = "Atallas csapvizre!\n";
@@ -201,7 +230,6 @@ void State_Machine(void) {
         lcd.print(lcdinfo);
         lcdinfo = "";
       }
-
       break;
 
     //*********************************************************************************************
@@ -211,7 +239,15 @@ void State_Machine(void) {
       switch_to_water();
     //******************************************
     case RUN_ON_WATER:
-      //SerialMon.println("running on water");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("uzemmod: csapviz");
+      lcd.setCursor(0, 1);
+      lcd.print("eloremeno: " + String(sec_fwd_temp) + "C");
+      lcd.setCursor(0, 2);
+      lcd.print("visszatero: " + String(pri_return_temp) + "C");
+      lcd.setCursor(0, 3);
+      lcd.print("atfolyas: " + String(water_flow) + " l/p");
       break;
 
     case ERROR_:
@@ -223,7 +259,6 @@ void State_Machine(void) {
       io_0.digitalWrite(SSR , OFF); //SSR off
       takeover_valves = false;
 
-      //info = +"\n**************ERROR******************";
       publish_info += " **** ERROR ****";
       send_SMS = true;
       send_mail = true;
@@ -241,7 +276,6 @@ void State_Machine(void) {
       if (AC_OK) {
         old_bypass_pos = BYPASS_OPEN;
         old_diverter_pos = DIVERTER_ON_WATER;
-        //info += "Aramellatas ok, ujraindulas\n";
         current_state = STARTUP;
 #ifdef debug
         Serial.println("current state=startup");

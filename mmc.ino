@@ -1,6 +1,5 @@
 //3percet bír
 
-
 #include <LiquidCrystal_PCF8574.h>
 
 //no sec flow -> SMS
@@ -26,7 +25,8 @@ typedef TinyGsmSim800 TinyGsm;
 typedef TinyGsmSim800::GsmClient TinyGsmClient;
 typedef TinyGsmSim800::GsmClientSecure TinyGsmClientSecure;
 
-unsigned long myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
+//unsigned long myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
+const char myChannelNumber = CHANNEL;  // Replace the 0 with your channel number
 const char * myWriteAPIKey = APIKEY;    // Paste your ThingSpeak Write API Key between the quotes
 
 #ifdef test
@@ -90,14 +90,31 @@ unsigned int analog_inputs[16];
 unsigned int compressor_current = 0;
 unsigned int pump_current = 0;
 
-const unsigned int io_0_debounce_periods[16] =
+//const unsigned int io_0_debounce_periods[16] =
+const unsigned int io_0_deb_per_L_to_H[16] =
   //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
 { 8000, 0, 0, 0, 0, 10, 10, 0,
   //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
-  10, 10, 10, 10, 10, 5000, 5000, 10
+  10, 10, 10, 10, 10, 5000, 40000, 10
 };
 
-const unsigned int io_7_debounce_periods[16] =
+const unsigned int io_0_deb_per_H_to_L[16] =
+  //AC_MONITOR, PUMP, CTRL_PULSE, SSR, BYPASS_VALVE, BYPASS_VALVE_RUN, DIVERTER_VALVE_RUN, DIVERTER_VALVE
+{ 8000, 0, 0, 0, 0, 10, 10, 0,
+  //SPARE_IN, LIMIT4, LIMIT3, DIVERTER_POS, BYPASS_POS, SEC_FLOW, PRI_FLOW, WATER_PULSE
+  10, 10, 10, 10, 10, 5000, 2000, 10
+};
+
+//*************************************************************************************
+//const unsigned int io_7_debounce_periods[16]
+const unsigned int io_7_deb_per_L_to_H[16] =
+  //PB_LED, IO1, IO2, IO3, PB_B, PB_R, PB_L, PB1
+{ 0, 0, 0, 0, 10, 10, 10, 10,
+  //SELFTEST, IO8, IO9, IO10, RED_LED, GREEN_LED, ORANGE_LED, PB2
+  1, 0, 0, 0, 0, 0, 0, 10
+};
+
+const unsigned int io_7_deb_per_H_to_L[16] =
   //PB_LED, IO1, IO2, IO3, PB_B, PB_R, PB_L, PB1
 { 0, 0, 0, 0, 10, 10, 10, 10,
   //SELFTEST, IO8, IO9, IO10, RED_LED, GREEN_LED, ORANGE_LED, PB2
@@ -142,16 +159,7 @@ struct publish_data {
 };
 
 QueueHandle_t queue;
-////#define DUMP_AT_COMMANDS
-//#ifdef DUMP_AT_COMMANDS
-//#include <StreamDebugger.h>
-//StreamDebugger debugger(SerialAT, SerialMon);
-//TinyGsm modem(debugger);
-//#else
-//TinyGsm modem(SerialAT);
-//#endif
 
-SerialSniffer sniffer(SerialAT, SerialMon);
 TinyGsm modem(SerialAT);//sniffer);
 
 Adafruit_MCP23017 io_0;
@@ -159,7 +167,6 @@ Adafruit_MCP23017 io_7;
 TinyGsmClient client(modem);
 
 LiquidCrystal_PCF8574 lcd(0x24);
-//WiFiClient client;
 
 void TaskGSM( void *pvParameters );
 
@@ -236,50 +243,35 @@ void setup()
 
   io_0.pinMode(AC_MONITOR, INPUT);
   io_0.pullUp(AC_MONITOR, HIGH);
-
   io_0.digitalWrite(PUMP, HIGH);
   io_0.pinMode(PUMP, OUTPUT);
-
   io_0.digitalWrite(CTRL_PULSE, LOW);
   io_0.pinMode(CTRL_PULSE, OUTPUT);
-
   io_0.digitalWrite(SSR, HIGH);
   io_0.pinMode(SSR, OUTPUT);
-
   io_0.digitalWrite(BYPASS_VALVE, HIGH);
   io_0.pinMode(BYPASS_VALVE , OUTPUT);
-
   io_0.pinMode(BYPASS_VALVE_RUN, INPUT);
   io_0.pullUp(BYPASS_VALVE_RUN, HIGH);
-
   io_0.pinMode(DIVERTER_VALVE_RUN, INPUT);
   io_0.pullUp(DIVERTER_VALVE_RUN, HIGH);
-
   io_0.digitalWrite(DIVERTER_VALVE, HIGH);
   io_0.pinMode(DIVERTER_VALVE , OUTPUT);
-
   //PORT B
   io_0.pinMode(SPARE_IN, INPUT);
   io_0.pullUp(SPARE_IN, HIGH);
-
   io_0.pinMode(LIMIT4, INPUT);
   io_0.pullUp(LIMIT4, HIGH);
-
   io_0.pinMode(LIMIT3, INPUT);
   io_0.pullUp(LIMIT3, HIGH);
-
   io_0.pinMode(DIVERTER_POS, INPUT);
   io_0.pullUp(DIVERTER_POS, HIGH);
-
   io_0.pinMode(BYPASS_POS, INPUT);
   io_0.pullUp(BYPASS_POS, HIGH);
-
   io_0.pinMode(SEC_FLOW, INPUT);
   io_0.pullUp(SEC_FLOW, HIGH);
-
   io_0.pinMode(PRI_FLOW, INPUT);
   io_0.pullUp(PRI_FLOW, HIGH);
-
   io_0.pinMode(WATER_PULSE, INPUT);
   io_0.pullUp(WATER_PULSE, HIGH);
   io_0.setupInterruptPin(WATER_PULSE, FALLING);
@@ -288,22 +280,18 @@ void setup()
   //PORT A
   io_7.digitalWrite(PB_LED, HIGH);
   io_7.pinMode(PB_LED , OUTPUT);
-
   io_7.pinMode(PB_R, INPUT);
   io_7.pullUp(PB_R, HIGH);
   io_7.pinMode(PB_L, INPUT);
   io_7.pullUp(PB_L, HIGH);
   io_7.pinMode(PB_B, INPUT);
   io_7.pullUp(PB_B, HIGH);
-
   io_7.pinMode(PB1, INPUT);
   io_7.pullUp(PB1, HIGH);
-
   //PORT B
   io_7.pinMode(RED_LED , OUTPUT);
   io_7.pinMode(ORANGE_LED , OUTPUT);
   io_7.pinMode(GREEN_LED , OUTPUT);
-
   io_7.pinMode(PB2, INPUT);
   io_7.pullUp(PB2, HIGH);
 
@@ -324,11 +312,6 @@ void setup()
 
   Wire.begin(I2C_SDA, I2C_SCL);
   bool   isOk = setPowerBoostKeepOn(1);
-  //  info = "IP5306 KeepOn " + String((isOk ? "PASS" : "FAIL"));
-  //SerialMon.println(info);
-
-  lcd.setCursor(0, 3);
-  //lcd.print(info);
 
   SPI.begin (SCK, MISO, MOSI, AN_CS);
 }
@@ -342,36 +325,10 @@ void loop()
 {
   ReadInputs();
 
-  io_7.digitalWrite(RED_LED, (io_7_inputs >> PB1) & 0x1);
+  io_7.digitalWrite(RED_LED, !(io_0.digitalRead(PRI_FLOW)));//     (io_7_inputs >> PB1) & 0x1);
   io_7.digitalWrite(GREEN_LED, (io_7_inputs >> PB2) & 0x1);
   io_7.digitalWrite(ORANGE_LED, PRI_FLOW_OK);
 
-  if (!AC_OK) {
-    if (ac_status) {
-      ac_status = false;
-      Serial.println ("nincs áram!!");
-      publish_info = "nincs aram\n";
-      publish_info += SITE;
-      publish_info += " tavfelugyelet";
-      send_SMS = true;
-      send_mail = true;
-      publish();
-      lcd.setBacklight(0);
-    }
-  }
-  else {
-    if (!ac_status) {
-      ac_status = true;
-      Serial.println ("van aram");
-      publish_info = "van aram\n";
-      publish_info += SITE;
-      publish_info += " tavfelugyelet";
-      send_SMS = true;
-      send_mail = true;
-      publish();
-      lcd.setBacklight(255);
-    }
-  }
   if (!ac_status) {
     if ((io_7_inputs >> PB_B) & 0x1) {
       lcd.setBacklight(255);
@@ -386,9 +343,10 @@ void loop()
     interruptCounter--;
     portEXIT_CRITICAL(&timerMux);
 
+    publish_data_counter++;
     start_ADC_counter++;
     if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
-    publish_data_counter++;
+
     //********************** state machine lockup prevention!!!!!!!!!!!!!!!!!!!!!!!!!!!
     State_Machine();
 
@@ -418,12 +376,38 @@ void loop()
     }
     //}
 
+    if (!AC_OK) {
+      if (ac_status) {
+        ac_status = false;
+        Serial.println ("nincs áram!!");
+        publish_info = "nincs aram\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+        lcd.setBacklight(0);
+      }
+    }
+    else {
+      if (!ac_status) {
+        ac_status = true;
+        Serial.println ("van aram");
+        publish_info = "van aram\n";
+        publish_info += SITE;
+        publish_info += " tavfelugyelet";
+        send_SMS = true;
+        send_mail = true;
+        publish();
+        lcd.setBacklight(255);
+      }
+    }
 
     //kompresszor megy?
     if (!COMPR_OK) {
       if (compr_status) {
         compr_status = false;
-        Serial.println ("A kompresszor nem megy!!");
+        Serial.println ("A kompresszor leállt!!");
         publish_info = "A kompresszor LEALLT!\n";
         publish_info += SITE;
         publish_info += " tavfelugyelet";
@@ -446,23 +430,27 @@ void loop()
     }
 
     if (publish_data_counter > PUBLISH_DATA_THRESHOLD) {
+      if (!((current_io_0 >> PRI_FLOW) & 0x1)) {
+        if (pri_flow_nok > 2) {
+          Serial.println ("Aramlas leallt " + String(pri_flow_nok) + " mp-re\n");
+          publish_info = "Aramlas leallt " + String(pri_flow_nok) + " mp-re\n";
+          publish_info += SITE;
+          publish_info += " tavfelugyelet";
+          send_SMS = true;
+          send_mail = true;
+        }
+      }
       publish();
+
       if (!((current_io_0 >> PRI_FLOW) & 0x1)) {
         pri_flow_nok = 0;
       }
     }
 
-
-    if ((current_io_0 >> PRI_FLOW) & 0x1){
-    //if (!PRI_FLOW_OK) {
+    if ((current_io_0 >> PRI_FLOW) & 0x1) {
+      //if (!PRI_FLOW_OK) {
       pri_flow_nok += 1;
     }
-    //    else {
-    //      //if (pri_flow_nok > 0) {
-    //
-    //      // }
-    //      pri_flow_nok = 0;
-    //    }
   }
   if (SerialMon.available()) command_interpreter();
 }
@@ -474,10 +462,10 @@ void loop()
 //*******************************************************************
 void ReadInputs(void) {
   unsigned int mask = 0;
+  unsigned int debounce_period = 0;
 
   current_io_0 = io_0.readGPIOAB();
   current_io_7 = io_7.readGPIOAB();
-
   unsigned int changed_io_0 = current_io_0 ^ prev_io_0;
   unsigned int changed_io_7 = current_io_7 ^ prev_io_7;
 
@@ -486,16 +474,22 @@ void ReadInputs(void) {
   for (byte i = 0; i < 16; i = i + 1) {
     mask = 1 << i;
 
-    if (io_0_debounce_periods[i] != 0) {
+    if ((io_0_deb_per_H_to_L[i] != 0) or (io_0_deb_per_L_to_H[i] != 0)) {
       if (changed_io_0 & mask) {
         io_0_lastchange[i] = millis();
       }
 
       else {
         if ((current_io_0 &  mask) != (io_0_inputs &  mask)) {
-          if ((millis() - io_0_lastchange[i]) > io_0_debounce_periods[i]) {
+          if (io_0_inputs &  mask) {
+            debounce_period = io_0_deb_per_H_to_L[i];
+          }
+          else {
+            debounce_period = io_0_deb_per_L_to_H[i];
+          }
+
+          if ((millis() - io_0_lastchange[i]) > debounce_period) { //io_0_debounce_periods[i]) {
             bitWrite(io_0_inputs, i, (current_io_0 &  mask));
-            //Serial.println("io0." + String(i) + " changed to " + String((io_0_inputs &  mask) >> i) + "\n");
             if (i == WATER_PULSE) {
               long timestamp = millis();
               if ((io_0_inputs >> WATER_PULSE) & 1) { //water meter pulse detected
@@ -503,29 +497,30 @@ void ReadInputs(void) {
                 prev_pulse = timestamp;
                 if ((timediff < 60000) & (timediff > 600)) {
                   water_flow = 60000.0 / timediff;
-                  //Serial.println("flow: " + String(water_flow));
                 }
                 else water_flow = 0;
-                //Serial.println("flow: " + String(water_flow));
               }
             }
-
           }
         }
       }
     }
 
-    if (io_7_debounce_periods[i] != 0) {
+    if ((io_7_deb_per_H_to_L[i] != 0) or (io_7_deb_per_L_to_H[i] != 0)) {
       if (changed_io_7 & mask) {
         io_7_lastchange[i] = millis();
       }
 
       else {
         if ((current_io_7 &  mask) != (io_7_inputs &  mask)) {
-          if ((millis() - io_7_lastchange[i]) > io_7_debounce_periods[i]) {
+          if (io_7_inputs &  mask) {
+            debounce_period = io_7_deb_per_H_to_L[i];
+          }
+          else {
+            debounce_period = io_7_deb_per_L_to_H[i];
+          }
+          if ((millis() - io_7_lastchange[i]) > debounce_period) { //io_7_debounce_periods[i]) {
             bitWrite(io_7_inputs, i, (current_io_7 &  mask));
-            //Serial.println("io7." + String(i) + " changed to " + String((io_7_inputs &  mask) >> i) + "\n");
-
           }
         }
       }
@@ -534,7 +529,6 @@ void ReadInputs(void) {
   prev_io_0 = current_io_0;
   prev_io_7 = current_io_7;
 }
-
 //************************************************************************
 //*
 //*   A/D conversion
@@ -582,12 +576,8 @@ void ADC() {
   room_temp = getTemp(analog_inputs[8]);
   he_return_temp = getTemp(analog_inputs[6]);
   he_fwd_temp = getTemp(analog_inputs[7]);
-
   compressor_current = analog_inputs[0];
   pump_current = analog_inputs[1];
-
-  //info = "sec1: " + String(sec_fwd_temp) + ", ";
-  //info += "pri1: " + String(pri_fwd_temp) + "\n";
 
 #ifdef fehervar
   lcd.clear();
@@ -597,22 +587,9 @@ void ADC() {
   lcd.print("s e/v: " + String(sec_fwd_temp) + "C/" + String(sec_return_temp) + "C");
   lcd.setCursor(0, 2);
   lcd.print("room temp: " + String(room_temp) + "C");
-
-  lcd.setCursor(0, 3);
-  lcd.print("flow: " + String(water_flow) + " l/p");
-#else
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("p/s e: " + String(pri_fwd_temp) + "C/" + String(sec_fwd_temp) + "C");
-  lcd.setCursor(0, 1);
-  lcd.print("visszatero: " + String(pri_return_temp) + "C");
-  lcd.setCursor(0, 2);
-  lcd.print("room temp: " + String(room_temp) + "C");
-
   lcd.setCursor(0, 3);
   lcd.print("flow: " + String(water_flow) + " l/p");
 #endif
-
   //appendFile(SD, "/temp_log.txt", info.c_str());
 }
 
@@ -627,7 +604,6 @@ void command_interpreter() {
   // SerialAT.println(command);
 
   if (command.equals("pump")) {
-
     temp = io_0.digitalRead(PUMP);
     io_0.digitalWrite(PUMP, !temp);
   }
@@ -639,30 +615,22 @@ void command_interpreter() {
     SerialMon.println("BYPASS " + String(temp));
     io_0.digitalWrite(BYPASS_VALVE, !temp);
     delay(100);
-    //io_0.digitalWrite(SSR, HIGH);
-
   }
 
   else if (command.equals("3w")) {
-
     temp = io_0.digitalRead(DIVERTER_VALVE);
     SerialMon.println("3W " + String(temp));
     io_0.digitalWrite(DIVERTER_VALVE, !temp);
   }
-
   else if (command.equals("ssr")) {
-
     temp = io_0.digitalRead(SSR);
     SerialMon.println("SSR " + String(temp));
     io_0.digitalWrite(SSR, !temp);
   }
-
   else if (command.equals("ctrl")) {
     takeover_valves = !takeover_valves;
   }
-
   else if (command.equals("mmv")) {
-
     temp = io_0.digitalRead(MMV_RESET);
     SerialMon.println("ctrl relay " + String(temp));
     io_0.digitalWrite(MMV_RESET, !temp);
@@ -671,7 +639,6 @@ void command_interpreter() {
     SerialMon.println("OUT");
     io_0.pinMode(BYPASS_VALVE , OUTPUT);
   }
-
   else {
     SerialMon.println("Invalid command");
   }
@@ -683,7 +650,6 @@ void command_interpreter() {
 //***********************************************************
 void publish()
 {
-
   SerialMon.println("start publish");
   if (queue == NULL) {
     SerialMon.println("queue is NULL in main loop");
@@ -713,12 +679,10 @@ void publish()
   bitWrite(status_code, 7, SEC_FLOW_OK);
   bitWrite(status_code, 8, PUMP_OK);
   bitWrite(status_code, 9, COMPR_OK);
-  //Serial.println("status_code" + String(status_code));
   data_to_publish.status_code = status_code;
 
   xQueueSend(queue, &data_to_publish, 0);
 }
-
 //***********************************************************************************************
 //*
 //*   get temperature
@@ -728,10 +692,8 @@ double getTemp(int val) {
 
   float Vout = 2.5 * ((float)(val / 4096.0));
   double res = (10000 * Vout / (3.3 - Vout));
-
   return (1.0 / (A + B * (double)log(res) + C * (double)cb((double)log(res)))) - 273.15; //natural log in arduino
-  //Use the steinhart-Hart equation with the resistance from analog input
-}
+ }
 //***********************************************************************************************
 //*
 //*
@@ -739,8 +701,7 @@ double getTemp(int val) {
 //***********************************************************************************************
 double cb(double val) {
   return val * val * val;
-  // cube function, cuz why not
-}
+ }
 //***********************************************************************************************
 //*
 //*   read a/d results
@@ -759,7 +720,6 @@ unsigned int read_SPI() {
 
   return (result);
 }
-
 //***********************************************************************************************
 //*
 //*   power keep on
@@ -775,8 +735,6 @@ bool setPowerBoostKeepOn(int en)
     Wire.write(0x35); // 0x37 is default reg value
   return Wire.endTransmission() == 0;
 }
-
-
 
 /*
      if (!SD.begin(SD_CS)) {

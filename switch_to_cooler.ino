@@ -8,6 +8,17 @@ void switch_to_cooler(void)
 #ifdef debug
       Serial.println("stc switch to cooler");
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print(" atallas vizhutore");
+      //      lcd.setCursor(0, 2);
+      //      lcd.print("                    ");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
+
+
       io_0.digitalWrite(SSR , OFF); //SSR off
       delay(20);
       io_0.digitalWrite(BYPASS_VALVE, CLOSE); //BYPASS valve close
@@ -26,6 +37,16 @@ void switch_to_cooler(void)
       run_time ++;
       Serial.println("run time : " + String(run_time));
 
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print(" atallas vizhutore");
+      lcd.setCursor(0, 2);
+      lcd.print("futasido: " + String(run_time) + " sec    ");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
+
       if (run_time > RUN_TIME_LIMIT) {
 #ifdef debug
         Serial.println("runtime > limit");
@@ -34,11 +55,29 @@ void switch_to_cooler(void)
 
         if (BYPASS_RUN) {
           Serial.println("BYPASS szelephiba, a szelep nem állt le!");
-          //info += "BYPASS szelephiba, a szelep nem allt le!\n";
+          SerialMon.println("BYPASS szelephiba, a szelep nem állt le!");
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
         if (DIVERTER_RUN) {
           Serial.println("DIVERTER szelephiba, a szelep nem állt le!");
-          //info += "DIVERTER szelephiba, a szelep nem allt le!\n";
+          SerialMon.println("BYPASS szelephiba, a szelep nem állt le!");
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
 
         io_0.digitalWrite(SSR , OFF); //SSR off
@@ -57,7 +96,15 @@ void switch_to_cooler(void)
 
         if (!BYPASS_RUN) {
           Serial.println("BYPASS szelephiba, a szelep nem megy!");
-          //info += "BYPASS szelephiba, a szelep nem megy!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=stc error");
@@ -66,7 +113,15 @@ void switch_to_cooler(void)
         }
         if (!DIVERTER_RUN) {
           Serial.println("diverter szelephiba, a szelep nem megy!");
-          //info += "DIVERTER szelephiba, a szelep nem megy!";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=stc error");
@@ -94,10 +149,26 @@ void switch_to_cooler(void)
 #endif
 
           if (BYPASS_OPEN) {
-            //info += "BYPASS szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("BYPASS szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           if (DIVERTER_ON_WATER) {
-            //info += "DIVERTER szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("DIVERT szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           current_state = ERROR_;
 #ifdef debug
@@ -123,6 +194,16 @@ void switch_to_cooler(void)
 #ifdef debug
       Serial.println("stc wait for flow " + String(startup_delay));
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("    wait for flow");
+      lcd.setCursor(0, 2);
+      lcd.print("kesleltetes: " + String(startup_delay) + "sec");
+      lcd.setCursor(0, 3);
+      lcd.print(String(PRI_FLOW_OK ? "aramlas ok" : "nincs aramlas"));
+
       startup_delay--;
       if (startup_delay > 0) {
         break;

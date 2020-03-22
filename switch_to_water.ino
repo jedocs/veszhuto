@@ -6,6 +6,17 @@ void switch_to_water(void)
 #ifdef debug
       Serial.println("switch to water");
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print(" atallas csapvizre");
+      //      lcd.setCursor(0, 2);
+      //      lcd.print("                    ");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
+
+
       io_0.digitalWrite(SSR , OFF); //SSR off
       delay(20);
       io_0.digitalWrite(BYPASS_VALVE, OPEN);
@@ -26,16 +37,34 @@ void switch_to_water(void)
 #endif
       run_time ++;
       SerialMon.println("run time : " + String(run_time));
+      lcd.setCursor(0, 2);
+      lcd.print("futasido: " + String(run_time) + " sec    ");
 
       if (run_time > RUN_TIME_LIMIT) {
 
         if (BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem állt le!");
-          //info += "BYPASS szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
         if (DIVERTER_RUN) {
           SerialMon.println("DIVERTER szelephiba, a szelep nem állt le!");
-          //info += "DIVERTER szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
 
         io_0.digitalWrite(SSR , OFF); //SSR off
@@ -50,7 +79,15 @@ void switch_to_water(void)
       if (run_time == 3) {
         if (!BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem megy!");
-          //info += "BYPASS szelephiba, a szelep nem megy!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=stw error");
@@ -59,7 +96,15 @@ void switch_to_water(void)
         }
         if (!DIVERTER_RUN) {
           SerialMon.println("diverter szelephiba, a szelep nem megy!");
-          //info += "DIVERTER szelephiba, a szelep nem megy!";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=stw error");
@@ -81,10 +126,26 @@ void switch_to_water(void)
         }
         else {
           if (BYPASS_CLOSED) {
-            //info += "BYPASS szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("BYPASS szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           if (DIVERTER_ON_COOLER) {
-            //info += "DIVERTER szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("DIVERT szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           current_state = ERROR_;
 #ifdef debug

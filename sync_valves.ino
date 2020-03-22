@@ -6,6 +6,17 @@ void sync_valves(void)
 #ifdef debug
       Serial.println("sv sync to cooler");
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("szelepek");
+      lcd.setCursor(0, 2);
+      lcd.print("szinkronizalasa");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
+
+
       io_0.digitalWrite(SSR , OFF); //SSR off
       delay(20);
       io_0.digitalWrite(BYPASS_VALVE, CLOSE); //BYPASS valve close
@@ -23,15 +34,41 @@ void sync_valves(void)
       run_time ++;
       SerialMon.println("run time : " + String(run_time));
 
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("szelepek");
+      lcd.setCursor(0, 2);
+      lcd.print("szinkronizalasa");
+      lcd.setCursor(0, 3);
+      lcd.print("futasido: " + String(run_time) + " sec    ");
+
       if (run_time > RUN_TIME_LIMIT) {
 
         if (BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem állt le!");
-          //info += "BYPASS szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
         if (DIVERTER_RUN) {
           SerialMon.println("DIVERTER szelephiba, a szelep nem állt le!");
-          //info += "DIVERTER szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
 
         io_0.digitalWrite(SSR , OFF); //SSR off
@@ -45,7 +82,15 @@ void sync_valves(void)
       if (run_time == 3) {
         if (!BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem megy!");
-          //info += "BYPASS szelephiba, a szelep nem megy!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=sv error");
@@ -67,10 +112,26 @@ void sync_valves(void)
         }
         else {
           if (BYPASS_OPEN) {
-            //info += "BYPASS szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("BYPASS szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           if (DIVERTER_ON_WATER) {
-            //info += "DIVERTER szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("DIVERT szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           current_state = ERROR_;
 #ifdef debug
@@ -91,22 +152,35 @@ void sync_valves(void)
         break;
       }
 
-    break;//*****************************************************************
+      break;
+
+    //************************************************************************
 
     case SV_SYNC_TO_WATER:
 #ifdef debug
       Serial.println("sv sync to water");
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("szelepek");
+      lcd.setCursor(0, 2);
+      lcd.print("szinkronizalasa");
+      lcd.setCursor(0, 3);
+      lcd.print(String(DIVERTER_ON_WATER ? "3w:csapviz," : "3w:vizhuto,") + String(BYPASS_OPEN ? "2w:nyitva" : "2w:zarva"));
+
 
       io_0.digitalWrite(SSR , OFF); //SSR off
       delay(20);
-      io_0.digitalWrite(BYPASS_VALVE, OPEN); //BYPASS valve close
+      io_0.digitalWrite(BYPASS_VALVE, OPEN); //BYPASS valve open
       io_0.digitalWrite(DIVERTER_VALVE, WATER);
       delay(50);
       io_0.digitalWrite(SSR , ON); //SSR on
       run_time = 0;
       sync_valves_status = SV_WAIT_FOR_WATER;
       break;
+
 
     case SV_WAIT_FOR_WATER:
 #ifdef debug
@@ -115,15 +189,42 @@ void sync_valves(void)
       run_time ++;
       SerialMon.println("run time : " + String(run_time));
 
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("szelepek");
+      lcd.setCursor(0, 2);
+      lcd.print("szinkronizalasa");
+      lcd.setCursor(0, 3);
+      lcd.print("futasido: " + String(run_time) + " sec    ");
+
+
       if (run_time > RUN_TIME_LIMIT) {
 
         if (BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem állt le!");
-          //info += "BYPASS szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
         if (DIVERTER_RUN) {
           SerialMon.println("DIVERTER szelephiba, a szelep nem állt le!");
-          //info += "DIVERTER szelephiba, a szelep nem allt le!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("DIVERT szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem allt le");
         }
 
         io_0.digitalWrite(SSR , OFF); //SSR off
@@ -138,7 +239,15 @@ void sync_valves(void)
       if (run_time == 3) {
         if (!BYPASS_RUN) {
           SerialMon.println("BYPASS szelephiba, a szelep nem megy!");
-          //info += "BYPASS szelephiba, a szelep nem megy!\n";
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("       HIBA!");
+          //          lcd.setCursor(0, 1);
+          //          lcd.print("                    ");
+          lcd.setCursor(0, 2);
+          lcd.print("BYPASS szelep hiba:");
+          lcd.setCursor(0, 3);
+          lcd.print("a szelep nem megy");
           current_state = ERROR_;
 #ifdef debug
           Serial.println("current state=sv error");
@@ -158,7 +267,15 @@ void sync_valves(void)
         }
         else {
           if (BYPASS_CLOSED) {
-            //info += "BYPASS szelep beragadt\n";
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("       HIBA!");
+            //            lcd.setCursor(0, 1);
+            //            lcd.print("                    ");
+            lcd.setCursor(0, 2);
+            lcd.print("BYPASS szelep hiba:");
+            lcd.setCursor(0, 3);
+            lcd.print("a szelep beszorult");
           }
           break;
         }
@@ -169,6 +286,16 @@ void sync_valves(void)
 #ifdef debug
       Serial.println("sv wait for flow " + String(startup_delay));
 #endif
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("      uzemmod:");
+      lcd.setCursor(0, 1);
+      lcd.print("    wait for flow");
+      lcd.setCursor(0, 2);
+      lcd.print("kesleltetes: " + String(startup_delay) + "sec");
+      lcd.setCursor(0, 3);
+      lcd.print(String(PRI_FLOW_OK ? "aramlas ok" : "nincs aramlas"));
+
       startup_delay--;
       if (startup_delay > 0) {
         break;
@@ -189,8 +316,8 @@ void sync_valves(void)
         break;
       }
       else {
+        current_state = RUN_ON_WATER;
         break;
       }
-
   }
 }

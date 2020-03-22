@@ -89,8 +89,6 @@
 #define IP5306_ADDR         0X75
 #define IP5306_REG_SYS_CTL0 0x00
 
-#define OLED_ADDR			0x3C
-
 //#define DUMP_AT_COMMANDS
 
 #define TINY_GSM_MODEM_SIM800      // Modem is SIM800
@@ -106,15 +104,15 @@
 
 #define SMS
 
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
-void createDir(fs::FS &fs, const char * path);
-void removeDir(fs::FS &fs, const char * path);
-void readFile(fs::FS &fs, const char * path);
-void writeFile(fs::FS &fs, const char * path, const char * message);
-void appendFile(fs::FS &fs, const char * path, const char * message);
-void renameFile(fs::FS &fs, const char * path1, const char * path2);
-void deleteFile(fs::FS &fs, const char * path);
-void testFileIO(fs::FS &fs, const char * path);
+//void listDir(fs::FS &fs, const char * dirname, uint8_t levels);
+//void createDir(fs::FS &fs, const char * path);
+//void removeDir(fs::FS &fs, const char * path);
+//void readFile(fs::FS &fs, const char * path);
+//void writeFile(fs::FS &fs, const char * path, const char * message);
+//void appendFile(fs::FS &fs, const char * path, const char * message);
+//void renameFile(fs::FS &fs, const char * path1, const char * path2);
+//void deleteFile(fs::FS &fs, const char * path);
+//void testFileIO(fs::FS &fs, const char * path);
 void ReadInputs(void);
 void State_Machine(void);
 void command_interpreter(void);
@@ -130,8 +128,6 @@ void i2c_scan();
 
 #define STARTUP_DELAY  10 //*********************************************
 #define PUMP_STARTUP_DELAY  6
-
-
 
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef fehervar
@@ -184,13 +180,7 @@ void i2c_scan();
 #define SV_SYNC_TO_WATER 2
 #define SV_WAIT_FOR_WATER 3
 #define SV_WAIT_FOR_FLOW 4
-
-
-
 #endif
-
-
-
 
 #define PRI_FWD_THRESH  15
 #define SEC_FWD_THRESH  19
