@@ -11,13 +11,14 @@
 #include <HTTPClient.h>
 #include "Adafruit_MCP23017.h"
 #include <SPI.h>
-#include "FS.h"
-#include "SD.h"
+//#include "FS.h"
+//#include "SD.h"
 #include "mmc.h"
 #include "pwds.h"
 #include <rom/rtc.h>
 #include "ThingSpeak.h"
-#include "SerialSniffer.h"
+//#include "SerialSniffer.h"
+#include "movAvg.h"
 
 #define TINY_GSM_MODEM_HAS_GPRS
 #define TINY_GSM_MODEM_HAS_SSL
@@ -57,6 +58,8 @@ unsigned char run_time = 0;
 
 int startup_delay = STARTUP_DELAY;
 int pri_flow_nok = 0;
+
+//int test = 10;
 
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -166,6 +169,16 @@ TinyGsm modem(SerialAT);//sniffer);
 Adafruit_MCP23017 io_0;
 Adafruit_MCP23017 io_7;
 TinyGsmClient client(modem);
+
+movingAvg avgPriFwd(20);
+movingAvg avgSecFwd(20);
+movingAvg avgPriReturn(1);
+movingAvg avgSecReturn(1);
+movingAvg avgRoom(20);
+movingAvg avgComprCurr(20);
+movingAvg avgPumpCurr(20);
+
+
 
 LiquidCrystal_PCF8574 lcd(0x24);
 
@@ -315,6 +328,14 @@ void setup()
   bool   isOk = setPowerBoostKeepOn(1);
 
   SPI.begin (SCK, MISO, MOSI, AN_CS);
+
+  avgPriFwd.begin();
+  avgSecFwd.begin();
+  avgPriReturn.begin();
+  avgSecReturn.begin();
+  avgRoom.begin();
+  avgComprCurr.begin();
+  avgPumpCurr.begin();
 }
 
 //***********************************************************
@@ -347,6 +368,9 @@ void loop()
     publish_data_counter++;
     start_ADC_counter++;
     if (start_ADC_counter > ADC_READ_THRESHOLD) ADC();
+
+    //pump_current = avgPumpCurr.reading(test);//analog_inputs[1]);
+    //SerialMon.println(String(test) + "     " + String(pump_current));
 
     //********************** state machine lockup prevention!!!!!!!!!!!!!!!!!!!!!!!!!!!
     State_Machine();
@@ -547,7 +571,13 @@ void ADC() {
     digitalWrite(AN_CS, LOW);    // SS is pin 10
     SPI.transfer (0x10);  //reset ADC
     digitalWrite(AN_CS, HIGH);
-    //info += "ADC hiba 1\n";
+    Serial.println ("ADC hiba 1 !!");
+    publish_info = "ADC hiba 1 !\n";
+    publish_info += SITE;
+    publish_info += " tavfelugyelet";
+    send_SMS = true;
+    send_mail = true;
+    publish();
     return;
   }
 
@@ -562,7 +592,13 @@ void ADC() {
     digitalWrite(AN_CS, LOW);    // SS is pin 10
     SPI.transfer (0x10);  //reset ADC
     digitalWrite(AN_CS, HIGH);
-    //info += "ADC hiba 2\n";
+    Serial.println ("ADC hiba 2 !!");
+    publish_info = "ADC hiba 2 !\n";
+    publish_info += SITE;
+    publish_info += " tavfelugyelet";
+    send_SMS = true;
+    send_mail = true;
+    publish();
     return;
   }
 
@@ -570,15 +606,15 @@ void ADC() {
     analog_inputs[i] = read_SPI();
   }
 
-  sec_return_temp = getTemp(analog_inputs[9]);
-  sec_fwd_temp = getTemp(analog_inputs[10]);
-  pri_return_temp = getTemp(analog_inputs[11]);
-  pri_fwd_temp = getTemp(analog_inputs[12]);
-  room_temp = getTemp(analog_inputs[8]);
-  he_return_temp = getTemp(analog_inputs[6]);
-  he_fwd_temp = getTemp(analog_inputs[7]);
-  compressor_current = analog_inputs[0];
-  pump_current = analog_inputs[1];
+  sec_return_temp = getTemp(avgSecReturn.reading(analog_inputs[9]));
+  sec_fwd_temp = getTemp(avgSecFwd.reading(analog_inputs[10]));
+  pri_return_temp = getTemp(avgPriReturn.reading(analog_inputs[11]));
+  pri_fwd_temp = getTemp(avgPriFwd.reading(analog_inputs[12]));
+  room_temp = getTemp(avgRoom.reading(analog_inputs[8]));
+  //he_return_temp = getTemp(analog_inputs[6]);
+  //he_fwd_temp = getTemp(analog_inputs[7]);
+  compressor_current = avgComprCurr.reading(analog_inputs[0]);
+  //  pump_current = avgPumpCurr.reading(test);//analog_inputs[1]);
 
 #ifdef fehervar
   lcd.clear();
@@ -603,6 +639,18 @@ void command_interpreter() {
   bool temp;
   command = SerialMon.readStringUntil('\n');
   // SerialAT.println(command);
+
+  /*
+    if (command.equals("+")) {
+      test -= 1;
+
+    }
+
+    if (command.equals("-")) {
+      test += 1;
+
+    }
+  */
 
   if (command.equals("pump")) {
     temp = io_0.digitalRead(PUMP);
@@ -694,7 +742,7 @@ double getTemp(int val) {
   float Vout = 2.5 * ((float)(val / 4096.0));
   double res = (10000 * Vout / (3.3 - Vout));
   return (1.0 / (A + B * (double)log(res) + C * (double)cb((double)log(res)))) - 273.15; //natural log in arduino
- }
+}
 //***********************************************************************************************
 //*
 //*
@@ -702,7 +750,7 @@ double getTemp(int val) {
 //***********************************************************************************************
 double cb(double val) {
   return val * val * val;
- }
+}
 //***********************************************************************************************
 //*
 //*   read a/d results

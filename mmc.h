@@ -183,7 +183,7 @@ void i2c_scan();
 #define SV_WAIT_FOR_FLOW 4
 #endif
 
-#define PRI_FWD_THRESH  15
+#define PRI_FWD_THRESH  16
 #define SEC_FWD_THRESH  19
 #define CLOSE HIGH
 #define OPEN LOW
